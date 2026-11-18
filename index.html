@@ -109,6 +109,7 @@ dialog::backdrop{background:#000a;backdrop-filter:blur(3px)}
 <nav class="tabs">
 <button class="tab active" data-tab="home">Сегодня</button>
 <button class="tab" data-tab="catalog">Продукты</button>
+<button class="tab" data-tab="dishes">Блюда</button>
 <button class="tab" data-tab="goals">Цели</button>
 <button class="tab" data-tab="backup">Данные</button>
 </nav>
@@ -157,6 +158,13 @@ dialog::backdrop{background:#000a;backdrop-filter:blur(3px)}
 </select></div>
 </div>
 <div id="products"></div>
+</div>
+</section>
+<section id="dishes" hidden>
+<div class="row"><h2>Готовые блюда</h2><button onclick="openDish()">＋ Блюдо</button></div>
+<div class="card">
+<p class="small">Соберите рецепт из продуктов каталога. КБЖУ рассчитывается по суммарному весу ингредиентов и показывается на 100 г готового блюда.</p>
+<div id="dishesList"></div>
 </div>
 </section>
 <section id="goals" hidden>
@@ -219,6 +227,7 @@ const defaults={
     {id:'u1',name:'Я',goals:{p:170,f:65,c:200}},
     {id:'u2',name:'Жена',goals:{p:130,f:55,c:160}}
   ],
+  dishes:[],
   products:[
     {id:'p1',name:'Куриная грудка',brand:'',category:'Мясо',state:'Сырой',k:120,p:23,f:2,c:0,batches:[],activeBatchId:null},
     {id:'p2',name:'Рис белый',brand:'',category:'Крупы',state:'Сухой',k:360,p:7,f:1,c:79,batches:[],activeBatchId:null},
@@ -270,6 +279,7 @@ function load(){
           activeProfile:'u1',
           profiles:[prof],
           products:prods,
+          dishes:Array.isArray(old.dishes)?old.dishes:[],
           diary,
           water:{u1:(old.water&&old.water.u1)||old.water||{}},
           settings:Object.assign(clone(defaults.settings),old.settings||{})
@@ -279,6 +289,7 @@ function load(){
     }
     const m=Object.assign(clone(defaults),raw);
     m.profiles=Array.isArray(raw.profiles)&&raw.profiles.length?raw.profiles:clone(defaults.profiles);
+    m.dishes=Array.isArray(raw.dishes)?raw.dishes:[];
     m.products=(Array.isArray(raw.products)?raw.products:clone(defaults.products)).map(p=>({
       ...p,
       batches:Array.isArray(p.batches)?p.batches:[],
@@ -308,7 +319,7 @@ let snap=(()=>{
   try{ const x=JSON.parse(localStorage.getItem(SNAP_KEY)||'null'); if(x&&typeof x==='object') return x; }catch(e){}
   const o={}; db.products.forEach(p=>o[p.id]=snapJson(p)); return o;
 })();
-const userPart=()=>({profiles:db.profiles,activeProfile:db.activeProfile,diary:db.diary,water:db.water});
+const userPart=()=>({profiles:db.profiles,activeProfile:db.activeProfile,diary:db.diary,dishes:db.dishes,water:db.water});
 let lastUserStr=JSON.stringify(userPart());
 function saveSnap(){ try{ localStorage.setItem(SNAP_KEY,JSON.stringify(snap)); }catch(e){} }
 function stampProducts(){
@@ -372,6 +383,7 @@ function applyServer(j){
       db.userU=Date.now(); scheduleSync(50);
     }else{
       db.profiles=u.profiles;
+      db.dishes=Array.isArray(u.dishes)?u.dishes:[];
       db.diary=Array.isArray(u.diary)?u.diary:[];
       db.water=(u.water&&typeof u.water==='object')?u.water:{};
       db.profiles.forEach(p=>{ if(!db.water[p.id]) db.water[p.id]={}; });
@@ -381,7 +393,7 @@ function applyServer(j){
     }
   }
   persist();
-  renderProfileSwitch(); renderHome(); renderCatalog(); fillGoals(); renderProfileList();
+  renderProfileSwitch(); renderHome(); renderCatalog(); renderDishes(); fillGoals(); renderProfileList();
 }
 document.addEventListener('visibilitychange',()=>{ if(!document.hidden) scheduleSync(100); });
 window.addEventListener('online',()=>scheduleSync(100));
@@ -412,8 +424,9 @@ $('themeBtn').onclick=()=>applyTheme(db.settings.theme==='light'?'dark':'light')
 /* ============ ТАБЫ ============ */
 document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{
   document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('active',x===b));
-  ['home','catalog','goals','backup'].forEach(x=>$(x).hidden=x!==b.dataset.tab);
+  ['home','catalog','dishes','goals','backup'].forEach(x=>$(x).hidden=x!==b.dataset.tab);
   if(b.dataset.tab==='catalog') renderCatalog();
+  if(b.dataset.tab==='dishes') renderDishes();
   if(b.dataset.tab==='goals'){ fillGoals(); renderProfileList(); }
 });
 
@@ -495,6 +508,54 @@ function addWater(n){
   db.water[p]=db.water[p]||{};
   db.water[p][currentDay]=Math.max(0,(db.water[p][currentDay]||0)+n);
   save(); renderHome();
+}
+
+/* ============ БЛЮДА ============ */
+function dishNutrition(dish){
+  let grams=0,k=0,p=0,f=0,c=0;
+  (dish.ingredients||[]).forEach(i=>{
+    const product=db.products.find(x=>x.id===i.productId); const g=num(i.grams);
+    if(!product||!g) return;
+    const n=effectiveNutrition(product); grams+=g; k+=n.k*g/100; p+=n.p*g/100; f+=n.f*g/100; c+=n.c*g/100;
+  });
+  const outGrams=num(dish.yieldGrams)||grams;
+  const factor=outGrams?100/outGrams:0;
+  return {grams:outGrams,ingredientGrams:grams,k:k*factor,p:p*factor,f:f*factor,c:c*factor,totalK:k,totalP:p,totalF:f,totalC:c};
+}
+function renderDishes(){
+  const el=$('dishesList'); if(!el) return;
+  if(!db.dishes.length){ el.innerHTML='<div class="empty">Блюд пока нет. Создайте первое блюдо из продуктов каталога.</div>'; return; }
+  el.innerHTML=db.dishes.map(d=>{
+    const n=dishNutrition(d), count=(d.ingredients||[]).length;
+    return `<div class="product"><div class="row"><div style="flex:1"><b>${esc(d.name)}</b><div class="small">${count} ингредиент${count===1?'':'а'} · выход ${fmt(d.yieldGrams||n.grams)} г</div><div class="small">${fmt(n.k)} ккал · Б ${fmt(n.p)} · Ж ${fmt(n.f)} · У ${fmt(n.c)} на 100 г</div></div><div class="actions"><button onclick="openDishAdd('${d.id}')">＋ В дневник</button><button class="secondary" onclick="editDish('${d.id}')">Изм.</button><button class="danger" onclick="delDish('${d.id}')">×</button></div></div></div>`;
+  }).join('');
+}
+function dishIngredientRow(i={productId:db.products[0]?.id||'',grams:100}){
+  return `<div class="batch-item dish-ingredient"><div class="info"><select name="ingredientProduct">${db.products.map(p=>`<option value="${p.id}" ${p.id===i.productId?'selected':''}>${esc(p.name)}${p.brand?' · '+esc(p.brand):''}</option>`).join('')}</select><input name="ingredientGrams" type="number" min="0.1" step=".1" value="${i.grams||100}" placeholder="Граммы"></div><button type="button" class="danger" onclick="this.closest('.dish-ingredient').remove();document.getElementById('df').dispatchEvent(new Event('input'))">×</button></div>`;
+}
+function openDish(dishId=null){
+  const d=dishId?db.dishes.find(x=>x.id===dishId):null;
+  $('dlgTitle').textContent=d?'Изменить блюдо':'Новое блюдо';
+  $('dlgBody').innerHTML=`<form id="df"><label>Название блюда</label><input name="name" required value="${esc(d?.name||'')}"><label>Выход готового блюда, г <span class="small">(необязательно; по умолчанию сумма ингредиентов)</span></label><input name="yieldGrams" type="number" min="0" step=".1" value="${d?.yieldGrams||''}"><div class="row" style="margin:14px 0 6px"><b>Ингредиенты</b><button type="button" class="secondary" onclick="document.getElementById('dishIngredients').insertAdjacentHTML('beforeend',dishIngredientRow());document.getElementById('df').dispatchEvent(new Event('input'))">＋ Добавить</button></div><div id="dishIngredients">${(d?.ingredients?.length?d.ingredients:[{}]).map(dishIngredientRow).join('')}</div><div class="batch-calc" id="dishCalc"></div><button type="submit">Сохранить блюдо</button></form>`;
+  const form=$('df');
+  function recalc(){
+    const rows=[...document.querySelectorAll('.dish-ingredient')].map(r=>({productId:r.querySelector('[name=ingredientProduct]').value,grams:num(r.querySelector('[name=ingredientGrams]').value)}));
+    const rawDish={ingredients:rows}; const n=dishNutrition(rawDish); const out=num(form.yieldGrams.value)||n.ingredientGrams;
+    $('dishCalc').innerHTML=n.ingredientGrams?`Ингредиентов: <b>${fmt(n.ingredientGrams)} г</b> · выход: <b>${fmt(out)} г</b><br><b>${fmt(n.totalK)} ккал</b> всего · на 100 г выхода: <b>${fmt(n.totalK*100/out)} ккал</b> · Б ${fmt(n.totalP*100/out)} · Ж ${fmt(n.totalF*100/out)} · У ${fmt(n.totalC*100/out)}`:'Добавьте хотя бы один ингредиент.';
+  }
+  form.oninput=recalc; recalc();
+  form.onsubmit=e=>{ e.preventDefault(); const rows=[...document.querySelectorAll('.dish-ingredient')].map(r=>({productId:r.querySelector('[name=ingredientProduct]').value,grams:num(r.querySelector('[name=ingredientGrams]').value)})).filter(x=>x.productId&&x.grams>0); if(!rows.length){toast('Добавьте ингредиенты');return;} const name=new FormData(form).get('name').trim(); const yieldGrams=num(new FormData(form).get('yieldGrams')); const obj={id:d?.id||uid(),name,ingredients:rows,yieldGrams}; if(d) db.dishes=db.dishes.map(x=>x.id===d.id?obj:x); else db.dishes.push(obj); save(); $('dlg').close(); renderDishes(); toast('Блюдо сохранено'); };
+  $('dlg').showModal();
+}
+function editDish(id){ openDish(id); }
+function delDish(id){ if(!confirm('Удалить блюдо? Старые записи дневника сохранятся.')) return; db.dishes=db.dishes.filter(x=>x.id!==id); save(); renderDishes(); toast('Блюдо удалено'); }
+function openDishAdd(dishId,entry=null){
+  const d=db.dishes.find(x=>x.id===dishId); if(!d) return; const n=dishNutrition(d); const initDate=entry?.date||currentDay;
+  $('dlgTitle').textContent=entry?'Изменить блюдо в дневнике':'Добавить блюдо в дневник';
+  $('dlgBody').innerHTML=`<form id="daf"><b>${esc(d.name)}</b><div class="small" style="margin:5px 0 12px">${fmt(n.k)} ккал · Б ${fmt(n.p)} · Ж ${fmt(n.f)} · У ${fmt(n.c)} на 100 г</div><label>Приём пищи</label><select name="meal">${MEALS.map(x=>`<option ${x===(entry?.meal||'Завтрак')?'selected':''}>${x}</option>`).join('')}</select><div class="formgrid"><div><label>Вес порции, г</label><input name="grams" type="number" min="0.1" step=".1" value="${entry?.grams||100}" required></div><div><label>Дата</label><input name="date" type="date" value="${initDate}" required></div></div><div class="small" id="dishDiaryPreview" style="font-size:14px;margin:6px 0"></div><button type="submit">Сохранить запись</button></form>`;
+  const form=$('daf'); const preview=()=>{const g=num(form.grams.value)/100; $('dishDiaryPreview').textContent=`${fmt(n.k*g)} ккал · Б ${fmt(n.p*g)} · Ж ${fmt(n.f*g)} · У ${fmt(n.c*g)} на порцию`;}; form.grams.oninput=preview; preview();
+  form.onsubmit=e=>{e.preventDefault(); const x=new FormData(form),g=num(x.get('grams')),f=g/100; const obj={id:entry?.id||uid(),profileId:db.activeProfile,dishId:d.id,name:d.name,meal:x.get('meal'),date:x.get('date'),grams:g,kcal:n.k*f,p:n.p*f,f:n.f*f,c:n.c*f}; if(entry) db.diary=db.diary.map(y=>y.id===entry.id?obj:y); else db.diary.push(obj); save(); $('dlg').close(); if(obj.date===currentDay)renderHome(); toast('Блюдо добавлено в дневник');};
+  $('dlg').showModal();
 }
 
 /* ============ КАТАЛОГ ============ */
@@ -874,7 +935,7 @@ function openAdd(meal='Завтрак',entry=null,preselect=null){
   };
   $('dlg').showModal();
 }
-function editEntry(id){ const x=db.diary.find(y=>y.id===id); if(x) openAdd(x.meal,x); }
+function editEntry(id){ const x=db.diary.find(y=>y.id===id); if(!x) return; if(x.dishId) openDishAdd(x.dishId,x); else openAdd(x.meal,x); }
 function delEntry(id){ if(!confirm('Удалить запись?')) return; db.diary=db.diary.filter(x=>x.id!==id); save(); renderHome(); toast('Удалено'); }
 function duplicateEntry(id){
   const x=db.diary.find(y=>y.id===id); if(!x) return;
@@ -991,7 +1052,7 @@ function importData(e){
       m.tomb=db.tomb||[]; m.userU=db.userU||0;
       db=m; save();
       applyTheme(db.settings.theme||'dark');
-      renderProfileSwitch(); renderHome(); renderCatalog(); fillGoals(); renderProfileList();
+      renderProfileSwitch(); renderHome(); renderCatalog(); renderDishes(); fillGoals(); renderProfileList();
       $('backupInfo').textContent='Копия восстановлена.';
       toast('Данные восстановлены');
     }catch(err){ alert('Файл не похож на резервную копию КБЖУ AI.'); }
@@ -1010,7 +1071,7 @@ function resetAll(){
   db=clone(defaults); db.products=keepP; db.tomb=keepT; db.userU=keepU; save();
   currentDay=today();
   applyTheme(db.settings.theme||'dark');
-  renderProfileSwitch(); renderHome(); renderCatalog(); fillGoals(); renderProfileList();
+  renderProfileSwitch(); renderHome(); renderCatalog(); renderDishes(); fillGoals(); renderProfileList();
   $('backupInfo').textContent='Ваши данные сброшены.';
   toast('Данные сброшены');
 }
