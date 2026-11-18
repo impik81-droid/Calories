@@ -1,0 +1,872 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#10131b">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="КБЖУ AI">
+<title>КБЖУ AI</title>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+<style>
+:root{--bg:#0c0f16;--panel:#151a25;--panel2:#1b2230;--line:#293244;--txt:#f4f6fb;--muted:#9aa6b8;--accent:#9b8cff;--green:#55d6a0;--orange:#ffbd69;--red:#ff7777;--shadow:#0002;--blue:#65c8ef}
+body.light{--bg:#f5f6fb;--panel:#ffffff;--panel2:#eef1f8;--line:#d8dee9;--txt:#151a25;--muted:#667085;--accent:#6b5cff;--shadow:#0001}
+*{box-sizing:border-box}html,body{margin:0}
+body{background:radial-gradient(900px 500px at 80% -10%,#252044 0%,transparent 55%),var(--bg);color:var(--txt);font:15px system-ui,-apple-system,Segoe UI,sans-serif;transition:background .2s,color .2s}
+body.light{background:radial-gradient(900px 500px at 80% -10%,#e6e2ff 0%,transparent 55%),var(--bg)}
+header{position:sticky;top:0;z-index:4;background:color-mix(in srgb,var(--bg) 92%,transparent);backdrop-filter:blur(16px);border-bottom:1px solid var(--line);padding:14px max(16px,calc((100% - 920px)/2))}
+.brand{font-weight:800;font-size:20px;letter-spacing:.2px}.brand span{color:var(--accent)}
+.sub{font-size:12px;color:var(--muted);margin-top:2px}
+.toprow{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.profileSwitch{display:flex;gap:6px;align-items:center;background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:4px;overflow:auto;max-width:100%}
+.profileSwitch button{background:transparent;color:var(--muted);padding:7px 12px;border-radius:9px;font-size:14px;font-weight:600;white-space:nowrap}
+.profileSwitch button.active{background:var(--accent);color:#fff}
+.themebtn{background:var(--panel2);border:1px solid var(--line);color:var(--txt);border-radius:10px;padding:8px 10px;font-size:16px;cursor:pointer}
+main{max-width:920px;margin:auto;padding:18px 14px 90px}
+.tabs{display:flex;gap:8px;overflow:auto;margin-bottom:16px;scrollbar-width:none}.tabs::-webkit-scrollbar{display:none}
+.tab{border:1px solid var(--line);background:var(--panel);color:var(--muted);padding:10px 14px;border-radius:13px;white-space:nowrap;cursor:pointer;font:inherit}
+.tab.active{background:color-mix(in srgb,var(--accent) 22%,var(--panel));color:var(--txt);border-color:var(--accent)}
+.card{background:linear-gradient(145deg,var(--panel),var(--panel2));border:1px solid var(--line);border-radius:19px;padding:16px;margin:12px 0;box-shadow:0 10px 28px var(--shadow)}
+h2{font-size:18px;margin:0 0 12px}h3{font-size:15px;margin:0 0 8px}
+.muted{color:var(--muted)}.small{font-size:12px;color:var(--muted)}
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.metric{background:var(--panel2);padding:12px;border-radius:13px;min-width:0}
+.metric b{display:block;font-size:20px;margin-top:4px}.metric span{font-size:11px;color:var(--muted)}
+.bar{height:8px;background:var(--line);border-radius:8px;overflow:hidden;margin-top:8px;position:relative}
+.bar i{display:block;height:100%;background:linear-gradient(90deg,var(--accent),var(--blue));border-radius:8px;transition:width .3s}
+.bar.ok i{background:linear-gradient(90deg,var(--green),#42b883)}
+.bar.warn i{background:linear-gradient(90deg,var(--orange),#ff9f43)}
+.bar.over i{background:linear-gradient(90deg,var(--red),#ff3b3b);box-shadow:0 0 8px var(--red)}
+.metric.over b{color:var(--red)}
+.metric.over .bar{background:#3a2222}
+.row{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.actions{display:flex;gap:7px;flex-wrap:wrap}
+button{border:0;border-radius:12px;padding:10px 13px;background:var(--accent);color:#fff;font-weight:650;cursor:pointer;font:inherit}
+button.secondary{background:var(--panel2);color:var(--txt);border:1px solid var(--line)}
+button.danger{background:#522b36;color:#ffb9c1}
+button.ghost{background:transparent;color:var(--muted);border:1px solid var(--line)}
+button:disabled{opacity:.4;cursor:not-allowed}
+input,select{width:100%;background:var(--bg);color:var(--txt);border:1px solid var(--line);border-radius:11px;padding:11px;margin:5px 0 10px;font:inherit}
+label{font-size:12px;color:var(--muted);display:block}
+.formgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+.formgrid .wide{grid-column:1/-1}
+.meal{margin:10px 0;padding:13px;border-radius:14px;background:var(--panel);border:1px solid var(--line)}
+.meal.collapsed .entry{display:none}
+.entry{padding:10px 0;border-top:1px solid var(--line)}
+.entry:first-child{border:0}
+.pill{font-size:11px;background:var(--panel2);color:var(--muted);padding:4px 8px;border-radius:20px}
+.pill.batch{background:color-mix(in srgb,var(--green) 25%,var(--panel2));color:var(--txt)}
+.product{padding:12px 0;border-top:1px solid var(--line)}.product:first-child{border:0}
+.empty{text-align:center;padding:28px;color:var(--muted)}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin:-4px 0 10px}
+.chip{background:var(--panel2);border:1px solid var(--line);color:var(--txt);border-radius:20px;padding:6px 12px;font-size:13px;cursor:pointer}
+.chip:active{background:var(--accent);color:#fff}
+.daynav{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.daynav button{padding:8px 11px}
+.daynav input[type=date]{width:auto;margin:0;padding:8px}
+.water{display:flex;align-items:center;gap:8px;margin-top:10px}
+.water b{font-size:16px}
+#toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--accent);color:#fff;padding:11px 16px;border-radius:12px;display:none;z-index:99;box-shadow:0 8px 30px #0006;max-width:90vw;text-align:center}
+dialog{background:var(--panel);color:var(--txt);border:1px solid var(--line);border-radius:18px;width:min(560px,94vw);padding:18px;max-height:90vh;overflow:auto}
+dialog::backdrop{background:#000a;backdrop-filter:blur(3px)}
+.searchbox{position:relative}
+.prodlist{max-height:160px;overflow:auto;border:1px solid var(--line);border-radius:11px;margin-bottom:10px}
+.prodlist div{padding:9px 11px;border-bottom:1px solid var(--line);cursor:pointer;font-size:13px}
+.prodlist div:last-child{border:0}
+.prodlist div:hover,.prodlist div.sel{background:var(--panel2)}
+.hidden{display:none!important}
+.batch-item{display:flex;align-items:flex-start;gap:10px;padding:10px 0;border-top:1px solid var(--line)}
+.batch-item:first-child{border:0}
+.batch-item .radio{width:22px;height:22px;border-radius:50%;border:2px solid var(--line);flex-shrink:0;margin-top:2px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.batch-item .radio.on{border-color:var(--accent)}
+.batch-item .radio.on::after{content:'';width:12px;height:12px;border-radius:50%;background:var(--accent)}
+.batch-item .info{flex:1;min-width:0}
+.batch-calc{background:var(--panel2);border-radius:12px;padding:12px;margin:10px 0;font-size:13px;line-height:1.6}
+.batch-calc b{color:var(--accent)}
+.ocr-status{font-size:13px;color:var(--muted);margin:8px 0}
+@media(max-width:560px){
+.grid{grid-template-columns:repeat(2,1fr)}
+.formgrid{grid-template-columns:1fr}.formgrid .wide{grid-column:auto}
+.metric b{font-size:18px}
+}
+</style>
+</head>
+<body>
+<header>
+<div class="toprow">
+<div>
+<div class="brand">КБЖУ <span>AI</span></div>
+<div class="sub">Дневник питания · v0.6 · профили и партии</div>
+</div>
+<div style="display:flex;gap:8px;align-items:center">
+<div class="profileSwitch" id="profileSwitch"></div>
+<button class="themebtn" id="themeBtn" title="Тема">🌙</button>
+</div>
+</div>
+</header>
+<main>
+<nav class="tabs">
+<button class="tab active" data-tab="home">Сегодня</button>
+<button class="tab" data-tab="catalog">Продукты</button>
+<button class="tab" data-tab="goals">Цели</button>
+<button class="tab" data-tab="backup">Данные</button>
+</nav>
+<section id="home">
+<div class="card">
+<div class="row">
+<div>
+<h2>Дневной баланс</h2>
+<div class="daynav" style="margin-top:6px">
+<button class="secondary" onclick="shiftDay(-1)">←</button>
+<button class="secondary" onclick="openCalendar()" id="dayBtn">📅 Календарь</button>
+<button class="secondary" onclick="shiftDay(1)">→</button>
+<button class="ghost" onclick="setDay(today())">Сегодня</button>
+</div>
+</div>
+<span class="pill" id="homeProfilePill">Цели</span>
+</div>
+<div class="grid" id="totals"></div>
+<div id="progress"></div>
+<div class="water">
+<span class="small">Вода:</span>
+<button class="secondary" onclick="addWater(-1)">−</button>
+<b id="waterVal">0</b>
+<span class="small">стаканов</span>
+<button class="secondary" onclick="addWater(1)">＋</button>
+</div>
+</div>
+<div class="row"><h2>Питание</h2><button onclick="openAdd()">＋ Добавить</button></div>
+<div id="meals"></div>
+</section>
+<section id="catalog" hidden>
+<div class="row"><h2>Каталог продуктов</h2><button onclick="openProduct()">＋ Продукт</button></div>
+<div class="card">
+<input id="search" placeholder="Поиск: название или бренд" oninput="renderCatalog()">
+<div class="formgrid">
+<div><label>Категория</label>
+<select id="catFilter" onchange="renderCatalog()">
+<option value="">Все категории</option>
+<option>Мясо</option><option>Рыба</option><option>Крупы</option>
+<option>Макароны</option><option>Молочные</option><option>Овощи</option>
+<option>Фрукты</option><option>Другое</option>
+</select></div>
+<div><label>Состояние</label>
+<select id="stateFilter" onchange="renderCatalog()">
+<option value="">Любое</option><option>Сухой</option><option>Сырой</option><option>Готовый</option>
+</select></div>
+</div>
+<div id="products"></div>
+</div>
+</section>
+<section id="goals" hidden>
+<div class="card">
+<h2>Цели профиля</h2>
+<p class="small">Калорийность считается по формуле: белки × 4 + углеводы × 4 + жиры × 9.</p>
+<div class="formgrid">
+<div><label>Белки, г</label><input id="gP" type="number" min="0"></div>
+<div><label>Жиры, г</label><input id="gF" type="number" min="0"></div>
+<div><label>Углеводы, г</label><input id="gC" type="number" min="0"></div>
+<div><label>Калорийность, ккал (расчёт)</label><input id="gK" disabled></div>
+</div>
+<button onclick="saveGoals()">Сохранить цели</button>
+<hr style="border:0;border-top:1px solid var(--line);margin:16px 0">
+<h3>Профили</h3>
+<div id="profileList"></div>
+<button class="secondary" onclick="openProfile()" style="margin-top:8px">＋ Добавить профиль</button>
+</div>
+</section>
+<section id="backup" hidden>
+<div class="card">
+<h2>Резервная копия</h2>
+<p class="small">Сохраняет профили, каталог, партии, цели и дневник в JSON. Данные хранятся в браузере на этом устройстве.</p>
+<div class="actions">
+<button onclick="exportData()">Экспорт JSON</button>
+<button class="secondary" onclick="document.getElementById('importFile').click()">Импорт JSON</button>
+<button class="secondary" onclick="exportCSV()">Экспорт CSV (дневник)</button>
+</div>
+<input id="importFile" type="file" accept="application/json" hidden onchange="importData(event)">
+<p class="small" id="backupInfo"></p>
+<hr style="border:0;border-top:1px solid var(--line);margin:14px 0">
+<h3>Опасная зона</h3>
+<div class="actions">
+<button class="danger" onclick="clearDiary()">Очистить дневник профиля</button>
+<button class="danger" onclick="resetAll()">Сбросить всё к демо</button>
+</div>
+</div>
+</section>
+</main>
+<div id="toast"></div>
+<dialog id="dlg">
+<div class="row"><h2 id="dlgTitle">Добавить</h2><button class="secondary" onclick="document.getElementById('dlg').close()">✕</button></div>
+<div id="dlgBody"></div>
+</dialog>
+<dialog id="calDlg">
+<div class="row"><h2>Календарь</h2><button class="secondary" onclick="document.getElementById('calDlg').close()">✕</button></div>
+<div id="calBody"></div>
+</dialog>
+<script>
+/* ============ БАЗА ============ */
+const KEY='kbzhu_ai_v06';
+const MEALS=['Завтрак','Обед','Ужин','Перекус'];
+const CATS=['Мясо','Рыба','Крупы','Макароны','Молочные','Овощи','Фрукты','Другое'];
+const STATES=['Сухой','Сырой','Готовый'];
+
+const defaults={
+  version:6,
+  activeProfile:'u1',
+  profiles:[
+    {id:'u1',name:'Я',goals:{p:170,f:65,c:200}},
+    {id:'u2',name:'Жена',goals:{p:130,f:55,c:160}}
+  ],
+  products:[
+    {id:'p1',name:'Куриная грудка',brand:'',category:'Мясо',state:'Сырой',k:120,p:23,f:2,c:0,batches:[],activeBatchId:null},
+    {id:'p2',name:'Рис белый',brand:'',category:'Крупы',state:'Сухой',k:360,p:7,f:1,c:79,batches:[],activeBatchId:null},
+    {id:'p3',name:'Макароны',brand:'',category:'Макароны',state:'Сухой',k:350,p:12,f:1.5,c:70,batches:[],activeBatchId:null},
+    {id:'p4',name:'Яйцо куриное',brand:'',category:'Другое',state:'Сырой',k:157,p:13,f:11,c:1.1,batches:[],activeBatchId:null},
+    {id:'p5',name:'Творог 5%',brand:'',category:'Молочные',state:'Готовый',k:121,p:17,f:5,c:1.8,batches:[],activeBatchId:null}
+  ],
+  diary:[],
+  water:{u1:{},u2:{}},
+  settings:{theme:'dark',collapsed:{},lastDate:null}
+};
+
+const clone=o=>JSON.parse(JSON.stringify(o));
+const uid=()=> (typeof crypto!=='undefined' && crypto.randomUUID) ? crypto.randomUUID() : 'id'+Date.now().toString(36)+Math.random().toString(36).slice(2,8);
+const $=id=>document.getElementById(id);
+const num=v=>Math.max(0,Number(v)||0);
+const fmt=v=>(Math.round(v*10)/10).toLocaleString('ru-RU');
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&','<':'<','>':'>','"':'"',"'":'&#39;'}[c]));
+const kcal=g=>g.p*4+g.c*4+g.f*9;
+const isoDate=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+const today=()=>isoDate(new Date());
+
+let db=load();
+let currentDay=db.settings.lastDate||today();
+
+function load(){
+  try{
+    const raw=JSON.parse(localStorage.getItem(KEY)||'null');
+    if(!raw){
+      const old=JSON.parse(
+        localStorage.getItem('kbzhu_ai_v05') ||
+        localStorage.getItem('kbzhu_ai_v04') ||
+        localStorage.getItem('kbzhu_ai_v03') ||
+        'null'
+      );
+      if(old){
+        const prof={id:'u1',name:'Я',goals:Object.assign(clone(defaults.profiles[0].goals),old.goals||{})};
+        const prods=(Array.isArray(old.products)?old.products:clone(defaults.products)).map(p=>({
+          ...p,
+          batches:Array.isArray(p.batches)?p.batches:[],
+          activeBatchId:p.activeBatchId||null
+        }));
+        const diary=(Array.isArray(old.diary)?old.diary:[]).map(d=>({...d,profileId:d.profileId||'u1'}));
+        return {
+          version:6,
+          activeProfile:'u1',
+          profiles:[prof],
+          products:prods,
+          diary,
+          water:{u1:(old.water&&old.water.u1)||old.water||{}},
+          settings:Object.assign(clone(defaults.settings),old.settings||{})
+        };
+      }
+      return clone(defaults);
+    }
+    const m=Object.assign(clone(defaults),raw);
+    m.profiles=Array.isArray(raw.profiles)&&raw.profiles.length?raw.profiles:clone(defaults.profiles);
+    m.products=(Array.isArray(raw.products)?raw.products:clone(defaults.products)).map(p=>({
+      ...p,
+      batches:Array.isArray(p.batches)?p.batches:[],
+      activeBatchId:p.activeBatchId||null
+    }));
+    m.diary=(Array.isArray(raw.diary)?raw.diary:[]).map(d=>({...d,profileId:d.profileId||m.activeProfile||'u1'}));
+    m.water=(raw.water&&typeof raw.water==='object')?raw.water:{};
+    m.profiles.forEach(p=>{ if(!m.water[p.id]) m.water[p.id]={}; });
+    m.settings=Object.assign(clone(defaults.settings),raw.settings||{});
+    if(!m.profiles.find(p=>p.id===m.activeProfile)) m.activeProfile=m.profiles[0].id;
+    return m;
+  }catch(e){ console.warn('load',e); return clone(defaults); }
+}
+function save(){
+  try{ localStorage.setItem(KEY,JSON.stringify(db)); }
+  catch(e){ toast('Хранилище переполнено'); console.error(e); }
+}
+let toastT;
+function toast(s){ const t=$('toast'); t.textContent=s; t.style.display='block'; clearTimeout(toastT); toastT=setTimeout(()=>t.style.display='none',2200); }
+
+/* ============ ПРОФИЛИ ============ */
+function activeProfile(){ return db.profiles.find(p=>p.id===db.activeProfile)||db.profiles[0]; }
+function renderProfileSwitch(){
+  $('profileSwitch').innerHTML=db.profiles.map(p=>
+    `<button class="${p.id===db.activeProfile?'active':''}" onclick="switchProfile('${p.id}')">${esc(p.name)}</button>`
+  ).join('');
+}
+function switchProfile(id){
+  if(!db.profiles.find(p=>p.id===id)) return;
+  db.activeProfile=id; save();
+  renderProfileSwitch(); renderHome(); fillGoals(); renderProfileList();
+  toast('Профиль: '+activeProfile().name);
+}
+
+/* ============ ТЕМА ============ */
+function applyTheme(t){
+  document.body.classList.toggle('light',t==='light');
+  $('themeBtn').textContent=t==='light'?'☀️':'🌙';
+  db.settings.theme=t; save();
+}
+$('themeBtn').onclick=()=>applyTheme(db.settings.theme==='light'?'dark':'light');
+
+/* ============ ТАБЫ ============ */
+document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('active',x===b));
+  ['home','catalog','goals','backup'].forEach(x=>$(x).hidden=x!==b.dataset.tab);
+  if(b.dataset.tab==='catalog') renderCatalog();
+  if(b.dataset.tab==='goals'){ fillGoals(); renderProfileList(); }
+});
+
+/* ============ ДЕНЬ ============ */
+function setDay(d){ if(!d) return; currentDay=d; db.settings.lastDate=d; save(); renderHome(); }
+function shiftDay(n){ const d=new Date(currentDay+'T00:00:00'); d.setDate(d.getDate()+n); setDay(isoDate(d)); }
+function dayRows(){ return db.diary.filter(x=>x.date===currentDay && x.profileId===db.activeProfile); }
+function sum(rows){ return rows.reduce((a,x)=>({k:a.k+x.kcal,p:a.p+x.p,f:a.f+x.f,c:a.c+x.c}),{k:0,p:0,f:0,c:0}); }
+function pct(v,g){ return g?v/g*100:0; }
+function pctClass(v,g){ const r=pct(v,g); if(r>100) return 'over'; if(r>=85) return 'ok'; if(r>=50) return 'warn'; return ''; }
+
+/* ============ ПАРТИИ ПРОДУКТА ============ */
+function activeBatch(product){
+  if(!product || !product.activeBatchId) return null;
+  return (product.batches||[]).find(b=>b.id===product.activeBatchId)||null;
+}
+function batchCalc(product, rawGrams, cookedGrams){
+  rawGrams=num(rawGrams); cookedGrams=num(cookedGrams);
+  if(!rawGrams || !cookedGrams) return {k:0,p:0,f:0,c:0,yield:0,ratio:0};
+  const ratio=rawGrams/cookedGrams;
+  return {
+    k:product.k*ratio,
+    p:product.p*ratio,
+    f:product.f*ratio,
+    c:product.c*ratio,
+    yield:cookedGrams/rawGrams,
+    ratio
+  };
+}
+function effectiveNutrition(product){
+  const b=activeBatch(product);
+  if(b) return {k:b.k,p:b.p,f:b.f,c:b.c,fromBatch:true,batch:b};
+  return {k:product.k,p:product.p,f:product.f,c:product.c,fromBatch:false,batch:null};
+}
+
+/* ============ ГЛАВНАЯ ============ */
+function renderHome(){
+  const prof=activeProfile();
+  renderProfileSwitch();
+  $('homeProfilePill').textContent=prof.name;
+  $('dayBtn').textContent='📅 '+new Date(currentDay+'T00:00:00').toLocaleDateString('ru-RU',{day:'numeric',month:'short'});
+  const dt=new Date(currentDay+'T00:00:00');
+  const label=dt.toLocaleDateString('ru-RU',{weekday:'long',day:'numeric',month:'long'})+(currentDay===today()?' · сегодня':'');
+  document.querySelector('#home h2').innerHTML='Дневной баланс <span class="small" style="font-weight:400">'+label+'</span>';
+  const s=sum(dayRows()),g=prof.goals,goalK=kcal(g);
+  const metrics=[['Калории',s.k,goalK,'ккал'],['Белки',s.p,g.p,'г'],['Жиры',s.f,g.f,'г'],['Углеводы',s.c,g.c,'г']];
+  $('totals').innerHTML=metrics.map(a=>{
+    const cls=pctClass(a[1],a[2]), w=Math.min(100,pct(a[1],a[2]));
+    return `<div class="metric ${cls}"><span>${a[0]}</span><b>${fmt(a[1])}</b><span>из ${fmt(a[2])} ${a[3]}</span><div class="bar ${cls}"><i style="width:${w}%"></i></div></div>`;
+  }).join('');
+  $('progress').innerHTML=`<p class="small">Осталось: ${fmt(Math.max(0,goalK-s.k))} ккал · Б ${fmt(Math.max(0,g.p-s.p))} г · Ж ${fmt(Math.max(0,g.f-s.f))} г · У ${fmt(Math.max(0,g.c-s.c))} г</p>`;
+  $('waterVal').textContent=(db.water[db.activeProfile]||{})[currentDay]||0;
+
+  $('meals').innerHTML=MEALS.map(m=>{
+    const arr=dayRows().filter(x=>x.meal===m),t=sum(arr);
+    const collapsed=!!db.settings.collapsed[m];
+    return `<div class="meal ${collapsed?'collapsed':''}">
+      <div class="row">
+        <div style="cursor:pointer;flex:1" onclick="toggleMeal('${m}')">
+          <h3>${collapsed?'▸':'▾'} ${m}</h3>
+          <div class="small">${arr.length} записей · ${fmt(t.k)} ккал · Б ${fmt(t.p)} / Ж ${fmt(t.f)} / У ${fmt(t.c)}</div>
+        </div>
+        <button class="secondary" onclick="openAdd('${m}')">＋</button>
+      </div>
+      ${arr.map(x=>`<div class="entry"><div class="row"><div style="flex:1">
+        <b>${esc(x.name)}</b> ${x.fromBatch?'<span class="pill batch">по партии</span>':''}
+        <div class="small">${fmt(x.grams)} г · ${fmt(x.kcal)} ккал · Б ${fmt(x.p)} Ж ${fmt(x.f)} У ${fmt(x.c)}${x.batchDate?' · партия от '+x.batchDate:''}</div>
+      </div><div class="actions">
+        <button class="secondary" title="Ещё раз" onclick="duplicateEntry('${x.id}')">⎘</button>
+        <button class="secondary" onclick="editEntry('${x.id}')">Изм.</button>
+        <button class="danger" onclick="delEntry('${x.id}')">×</button>
+      </div></div></div>`).join('')||'<div class="small" style="padding-top:8px">Пока пусто</div>'}
+    </div>`;
+  }).join('');
+}
+function toggleMeal(m){ db.settings.collapsed[m]=!db.settings.collapsed[m]; save(); renderHome(); }
+function addWater(n){
+  const p=db.activeProfile;
+  db.water[p]=db.water[p]||{};
+  db.water[p][currentDay]=Math.max(0,(db.water[p][currentDay]||0)+n);
+  save(); renderHome();
+}
+
+/* ============ КАТАЛОГ ============ */
+function renderCatalog(){
+  const q=($('search').value||'').toLowerCase().trim();
+  const cat=$('catFilter').value, st=$('stateFilter').value;
+  const arr=db.products.filter(p=>{
+    const hay=((p.name||'')+' '+(p.brand||'')).toLowerCase();
+    return hay.includes(q) && (!cat||p.category===cat) && (!st||p.state===st);
+  });
+  $('products').innerHTML=arr.map(p=>{
+    const b=activeBatch(p);
+    const nut=b?`${fmt(b.k)} ккал · Б ${fmt(b.p)} · Ж ${fmt(b.f)} · У ${fmt(b.c)} на 100 г готового`:`${fmt(p.k)} ккал · Б ${fmt(p.p)} · Ж ${fmt(p.f)} · У ${fmt(p.c)} на 100 г`;
+    const badge=b?`<span class="pill batch">по партии от ${esc(b.date)}</span>`:'';
+    const batchesInfo=b?`<div class="small">выход ×${fmt(b.cookedGrams/b.rawGrams)} (${fmt(b.rawGrams)} г → ${fmt(b.cookedGrams)} г)</div>`:'';
+    const batchesCount=(p.batches||[]).length;
+    return `<div class="product"><div class="row"><div style="flex:1">
+      <b>${esc(p.name)}</b> ${p.brand?'<span class="pill">'+esc(p.brand)+'</span>':''} ${badge}
+      <div class="small">${esc(p.category)} · ${esc(p.state)} · ${nut}</div>
+      ${batchesInfo}
+    </div><div class="actions">
+      <button class="secondary" title="Партии" onclick="openBatches('${p.id}')">Партии (${batchesCount})</button>
+      <button class="secondary" title="Добавить в дневник" onclick="openAdd('Завтрак',null,'${p.id}')">＋</button>
+      <button class="secondary" onclick="editProduct('${p.id}')">Изм.</button>
+      <button class="danger" onclick="delProduct('${p.id}')">×</button>
+    </div></div></div>`;
+  }).join('')||'<div class="empty">Ничего не найдено</div>';
+}
+
+/* ============ ПРОДУКТ: ФОРМА (с OCR) ============ */
+function productForm(p={}){
+  $('dlgTitle').textContent=p.id?'Изменить продукт':'Новый продукт';
+  $('dlgBody').innerHTML=`<form id="pf">
+    <div class="actions" style="margin-bottom:12px">
+      <button type="button" class="secondary" onclick="document.getElementById('ocrFile').click()">Сканировать этикетку</button>
+      <input type="file" id="ocrFile" accept="image/*" hidden>
+    </div>
+    <div class="ocr-status" id="ocrStatus"></div>
+    <label>Название</label><input name="name" required value="${esc(p.name||'')}">
+    <div class="formgrid">
+      <div><label>Бренд</label><input name="brand" value="${esc(p.brand||'')}"></div>
+      <div><label>Категория</label><select name="category">${CATS.map(x=>`<option ${p.category===x?'selected':''}>${x}</option>`).join('')}</select></div>
+      <div><label>Состояние</label><select name="state">${STATES.map(x=>`<option ${p.state===x?'selected':''}>${x}</option>`).join('')}</select></div>
+      <div><label>Ккал / 100 г</label><input name="k" type="number" step=".1" min="0" required value="${p.k??0}"></div>
+      <div><label>Белки, г</label><input name="p" type="number" step=".1" min="0" required value="${p.p??0}"></div>
+      <div><label>Жиры, г</label><input name="f" type="number" step=".1" min="0" required value="${p.f??0}"></div>
+      <div><label>Углеводы, г</label><input name="c" type="number" step=".1" min="0" required value="${p.c??0}"></div>
+    </div>
+    <button type="submit">Сохранить продукт</button>
+  </form>`;
+
+  $('ocrFile').onchange = async e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const status = $('ocrStatus');
+    status.textContent = 'Распознаю этикетку...';
+    try {
+      const { data: { text } } = await Tesseract.recognize(file, 'rus+eng', {
+        logger: m => { if (m.status === 'recognizing text') status.textContent = `Распознаю... ${Math.round(m.progress*100)}%`; }
+      });
+      status.textContent = 'Готово. Проверь поля.';
+      fillFromOCR(text);
+    } catch (err) {
+      status.textContent = 'Ошибка распознавания';
+      console.error(err);
+    }
+    e.target.value = '';
+  };
+
+  $('pf').onsubmit=e=>{
+    e.preventDefault();
+    const d=Object.fromEntries(new FormData(e.target));
+    const obj={...p,id:p.id||uid(),name:d.name.trim(),brand:d.brand.trim(),category:d.category,state:d.state,k:num(d.k),p:num(d.p),f:num(d.f),c:num(d.c),batches:p.batches||[],activeBatchId:p.activeBatchId||null};
+    const dup=db.products.find(x=>x.id!==obj.id && x.name.toLowerCase()===obj.name.toLowerCase() && (x.brand||'').toLowerCase()===(obj.brand||'').toLowerCase());
+    if(dup && !confirm('Похожий продукт уже есть: «'+dup.name+'». Всё равно сохранить?')) return;
+    if(p.id) db.products=db.products.map(x=>x.id===p.id?obj:x);
+    else db.products.push(obj);
+    save(); $('dlg').close(); renderCatalog(); toast('Продукт сохранён');
+  };
+  $('dlg').showModal();
+}
+
+function fillFromOCR(text) {
+  const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+  const form = document.getElementById('pf');
+  if (!form) return;
+
+  const nameLine = lines.find(l => l.length > 5 && !/ккал|белк|жир|углев|энерг/i.test(l));
+  if (nameLine) form.name.value = nameLine.slice(0, 60);
+
+  const kcalMatch = text.match(/(\d+[\.,]?\d*)\s*ккал/i) || text.match(/энерг[а-я]*\s*[:\-]\s*(\d+)/i);
+  if (kcalMatch) form.k.value = parseFloat(kcalMatch[1].replace(',', '.'));
+
+  const pMatch = text.match(/белк[а-я]*\s*[:\-]?\s*(\d+[\.,]?\d*)/i);
+  if (pMatch) form.p.value = parseFloat(pMatch[1].replace(',', '.'));
+
+  const fMatch = text.match(/жир[а-я]*\s*[:\-]?\s*(\d+[\.,]?\d*)/i);
+  if (fMatch) form.f.value = parseFloat(fMatch[1].replace(',', '.'));
+
+  const cMatch = text.match(/углев[а-я]*\s*[:\-]?\s*(\d+[\.,]?\d*)/i);
+  if (cMatch) form.c.value = parseFloat(cMatch[1].replace(',', '.'));
+}
+
+function openProduct(){ productForm(); }
+function editProduct(id){ const p=db.products.find(x=>x.id===id); if(p) productForm(p); }
+function delProduct(id){
+  if(!confirm('Удалить продукт из каталога? Старые записи сохранятся.')) return;
+  db.products=db.products.filter(x=>x.id!==id); save(); renderCatalog(); toast('Продукт удалён');
+}
+
+/* ============ ПАРТИИ ПРОДУКТА: СПИСОК ============ */
+function openBatches(productId){
+  const p=db.products.find(x=>x.id===productId); if(!p) return;
+  $('dlgTitle').textContent='Партии: '+p.name;
+  $('dlgBody').innerHTML=`
+    <p class="small">Активная партия применяется при списании в дневник. Новые записи фиксируют КБЖУ по активной партии. Старые записи не пересчитываются.</p>
+    <div id="batchItems"></div>
+    <button onclick="openBatch('${p.id}')" style="margin-top:10px">＋ Новая партия</button>`;
+  renderBatchItems(p.id);
+  $('dlg').showModal();
+}
+function renderBatchItems(productId){
+  const p=db.products.find(x=>x.id===productId); if(!p) return;
+  const el=$('batchItems'); if(!el) return;
+  if(!(p.batches||[]).length){
+    el.innerHTML='<div class="empty">Партий пока нет. Продукт считается по сырым значениям.</div>';
+    return;
+  }
+  el.innerHTML=[...p.batches].sort((a,b)=>(b.date||'').localeCompare(a.date||'')).map(b=>{
+    const on=b.id===p.activeBatchId;
+    const out=b.cookedGrams/b.rawGrams;
+    return `<div class="batch-item">
+      <div class="radio ${on?'on':''}" onclick="setActiveBatch('${p.id}','${b.id}')" title="Сделать активной"></div>
+      <div class="info">
+        <b>${esc(b.date)}</b> ${on?'<span class="pill batch">активная</span>':''}
+        <div class="small">${fmt(b.rawGrams)} г сырого → ${fmt(b.cookedGrams)} г готового · выход ×${fmt(out)}</div>
+        <div class="small">на 100 г готового: ${fmt(b.k)} ккал · Б ${fmt(b.p)} · Ж ${fmt(b.f)} · У ${fmt(b.c)}</div>
+      </div>
+      <div class="actions">
+        <button class="secondary" onclick="openBatch('${p.id}','${b.id}')">Изм.</button>
+        <button class="danger" onclick="delBatch('${p.id}','${b.id}')">×</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+function setActiveBatch(productId,batchId){
+  const p=db.products.find(x=>x.id===productId); if(!p) return;
+  p.activeBatchId=batchId; save();
+  renderBatchItems(productId); renderCatalog(); renderHome();
+  toast('Активная партия изменена');
+}
+function delBatch(productId,batchId){
+  if(!confirm('Удалить партию? Записи дневника, сделанные по ней, сохранятся как есть.')) return;
+  const p=db.products.find(x=>x.id===productId); if(!p) return;
+  p.batches=(p.batches||[]).filter(b=>b.id!==batchId);
+  if(p.activeBatchId===batchId) p.activeBatchId=p.batches[0]?.id||null;
+  save(); renderBatchItems(productId); renderCatalog(); renderHome(); toast('Партия удалена');
+}
+
+/* ============ ПАРТИЯ: ФОРМА ============ */
+function openBatch(productId, batchId=null){
+  const p=db.products.find(x=>x.id===productId); if(!p) return;
+  const b=batchId?(p.batches||[]).find(x=>x.id===batchId):null;
+  const init={date:b?.date||today(),rawGrams:b?.rawGrams||0,cookedGrams:b?.cookedGrams||0};
+  $('dlgTitle').textContent=(b?'Изменить партию':'Новая партия')+': '+p.name;
+  $('dlgBody').innerHTML=`<form id="bf">
+    <label>Дата приготовления</label>
+    <input name="date" type="date" value="${init.date}" required>
+    <div class="formgrid">
+      <div><label>Сырой вес, г</label><input name="rawGrams" type="number" min="0.1" step=".1" value="${init.rawGrams}" required></div>
+      <div><label>Готовый вес, г</label><input name="cookedGrams" type="number" min="0.1" step=".1" value="${init.cookedGrams}" required></div>
+    </div>
+    <div class="batch-calc" id="batchCalc"></div>
+    <button type="submit">Сохранить партию</button>
+  </form>`;
+  function recalc(){
+    const raw=num(document.querySelector('#bf [name=rawGrams]').value);
+    const cooked=num(document.querySelector('#bf [name=cookedGrams]').value);
+    const c=batchCalc(p,raw,cooked);
+    const el=$('batchCalc');
+    if(!raw||!cooked){ el.textContent='Введите оба веса для расчёта.'; return; }
+    el.innerHTML=`Выход: <b>×${fmt(c.yield)}</b> (${fmt(raw)} г → ${fmt(cooked)} г)<br>
+      КБЖУ на 100 г готового:<br>
+      <b>${fmt(c.k)} ккал</b> · Б <b>${fmt(c.p)}</b> · Ж <b>${fmt(c.f)}</b> · У <b>${fmt(c.c)}</b><br>
+      <span class="small">(рассчитано по сырым значениям продукта и потере/прибавке веса)</span>`;
+  }
+  document.querySelector('#bf [name=rawGrams]').oninput=recalc;
+  document.querySelector('#bf [name=cookedGrams]').oninput=recalc;
+  recalc();
+  $('bf').onsubmit=e=>{
+    e.preventDefault();
+    const d=Object.fromEntries(new FormData(e.target));
+    const raw=num(d.rawGrams), cooked=num(d.cookedGrams);
+    if(!raw||!cooked){ toast('Введите оба веса'); return; }
+    const c=batchCalc(p,raw,cooked);
+    const obj={id:b?.id||uid(),date:d.date,rawGrams:raw,cookedGrams:cooked,k:c.k,p:c.p,f:c.f,c:c.c};
+    if(b) p.batches=p.batches.map(x=>x.id===b.id?obj:x);
+    else p.batches=[...(p.batches||[]),obj];
+    p.activeBatchId=obj.id;
+    save();
+    $('dlg').close();
+    renderCatalog(); renderHome();
+    toast('Партия сохранена и активна');
+  };
+  $('dlg').showModal();
+}
+
+/* ============ ДОБАВЛЕНИЕ В ДНЕВНИК ============ */
+function openAdd(meal='Завтрак',entry=null,preselect=null){
+  const initId=entry?.productId||preselect||db.products[0]?.id||'';
+  const initDate=entry?.date||currentDay;
+  $('dlgTitle').textContent=entry?'Изменить запись':'Добавить в дневник';
+  $('dlgBody').innerHTML=`<form id="af">
+    <label>Приём пищи</label>
+    <select name="meal">${MEALS.map(x=>`<option ${meal===x?'selected':''}>${x}</option>`).join('')}</select>
+    <label>Продукт</label>
+    <div class="searchbox"><input id="aSearch" placeholder="Поиск…" value="${esc(db.products.find(p=>p.id===initId)?.name||'')}" autocomplete="off"></div>
+    <div class="prodlist" id="aList"></div>
+    <select name="product" id="aProduct" class="hidden">${db.products.map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join('')}</select>
+    <div class="formgrid">
+      <div>
+        <label>Вес порции, г</label>
+        <input name="grams" type="number" min="0.1" step=".1" value="${entry?.grams||100}" required>
+        <div class="chips">${[50,100,150,200,250].map(g=>`<button type="button" class="chip" onclick="document.querySelector('#af [name=grams]').value=${g};document.querySelector('#af [name=grams]').dispatchEvent(new Event('input'))">${g}</button>`).join('')}</div>
+      </div>
+      <div><label>Дата</label><input name="date" type="date" value="${initDate}" required></div>
+    </div>
+    <div class="small" id="preview" style="font-size:14px;margin:6px 0"></div>
+    <button type="submit">Сохранить запись</button>
+  </form>`;
+
+  const sel=$('aProduct'), searchInput=$('aSearch'), listEl=$('aList');
+  sel.value=initId;
+
+  function drawList(){
+    const q=searchInput.value.toLowerCase().trim();
+    const arr=db.products.filter(p=>((p.name||'')+' '+(p.brand||'')).toLowerCase().includes(q));
+    if(!arr.length){ listEl.innerHTML='<div class="small" style="padding:10px">Ничего не найдено</div>'; return; }
+    listEl.innerHTML=arr.slice(0,30).map(p=>{
+      const b=activeBatch(p);
+      const nut=b?`${fmt(b.k)} ккал/100г (партия)`:`${fmt(p.k)} ккал/100г`;
+      return `<div data-id="${p.id}" class="${p.id===sel.value?'sel':''}">${esc(p.name)}${p.brand?' · '+esc(p.brand):''} <span class="small">(${nut})</span></div>`;
+    }).join('');
+  }
+  function preview(){
+    const p=db.products.find(x=>x.id===sel.value);
+    const g=num(document.querySelector('#af [name=grams]').value);
+    if(!p){ $('preview').textContent=''; return; }
+    const en=effectiveNutrition(p);
+    const f=g/100;
+    const tail=en.fromBatch?` <span class="small">(по партии от ${esc(en.batch.date)})</span>`:'';
+    $('preview').innerHTML=`${fmt(en.k*f)} ккал · Б ${fmt(en.p*f)} · Ж ${fmt(en.f*f)} · У ${fmt(en.c*f)} на порцию${tail}`;
+  }
+  searchInput.oninput=drawList;
+  listEl.onclick=e=>{
+    const it=e.target.closest('[data-id]'); if(!it) return;
+    sel.value=it.dataset.id; searchInput.value=db.products.find(p=>p.id===it.dataset.id)?.name||'';
+    drawList(); preview();
+  };
+  document.querySelector('#af [name=grams]').oninput=preview;
+  drawList(); preview();
+
+  $('af').onsubmit=e=>{
+    e.preventDefault();
+    const d=Object.fromEntries(new FormData(e.target));
+    const p=db.products.find(x=>x.id===sel.value); if(!p){ toast('Выберите продукт'); return; }
+    const g=num(d.grams), f=g/100;
+    const en=effectiveNutrition(p);
+    const obj={
+      id:entry?.id||uid(),
+      profileId:db.activeProfile,
+      productId:p.id,
+      name:p.name,
+      meal:d.meal,
+      date:d.date,
+      grams:g,
+      kcal:en.k*f, p:en.p*f, f:en.f*f, c:en.c*f,
+      fromBatch:en.fromBatch,
+      batchId:en.batch?.id||null,
+      batchDate:en.batch?.date||null
+    };
+    if(entry) db.diary=db.diary.map(x=>x.id===entry.id?obj:x);
+    else db.diary.push(obj);
+    save(); $('dlg').close();
+    if(d.date===currentDay) renderHome();
+    toast('Запись сохранена');
+  };
+  $('dlg').showModal();
+}
+function editEntry(id){ const x=db.diary.find(y=>y.id===id); if(x) openAdd(x.meal,x); }
+function delEntry(id){ if(!confirm('Удалить запись?')) return; db.diary=db.diary.filter(x=>x.id!==id); save(); renderHome(); toast('Удалено'); }
+function duplicateEntry(id){
+  const x=db.diary.find(y=>y.id===id); if(!x) return;
+  const copy={...x,id:uid(),date:currentDay,profileId:db.activeProfile};
+  db.diary.push(copy); save(); renderHome(); toast('Запись продублирована');
+}
+
+/* ============ ЦЕЛИ ============ */
+function fillGoals(){
+  const g=activeProfile().goals;
+  $('gP').value=g.p; $('gF').value=g.f; $('gC').value=g.c;
+  $('gK').value=fmt(kcal(g));
+}
+function saveGoals(){
+  const prof=activeProfile();
+  prof.goals={p:num($('gP').value),f:num($('gF').value),c:num($('gC').value)};
+  save(); fillGoals(); renderHome(); toast('Цели обновлены');
+}
+
+/* ============ ПРОФИЛИ: УПРАВЛЕНИЕ ============ */
+function renderProfileList(){
+  $('profileList').innerHTML=db.profiles.map(p=>{
+    const active=p.id===db.activeProfile;
+    return `<div class="batch-item">
+      <div class="info">
+        <b>${esc(p.name)}</b> ${active?'<span class="pill batch">активный</span>':''}
+        <div class="small">КБЖУ: Б ${fmt(p.goals.p)} · Ж ${fmt(p.goals.f)} · У ${fmt(p.goals.c)} · ${fmt(kcal(p.goals))} ккал</div>
+      </div>
+      <div class="actions">
+        <button class="secondary" onclick="openProfile('${p.id}')">Изм.</button>
+        ${db.profiles.length>1?`<button class="danger" onclick="delProfile('${p.id}')">×</button>`:''}
+      </div>
+    </div>`;
+  }).join('');
+}
+function openProfile(id=null){
+  const p=id?db.profiles.find(x=>x.id===id):null;
+  $('dlgTitle').textContent=p?'Изменить профиль':'Новый профиль';
+  $('dlgBody').innerHTML=`<form id="prf">
+    <label>Имя</label><input name="name" required value="${esc(p?.name||'')}">
+    <div class="formgrid">
+      <div><label>Белки, г</label><input name="p" type="number" min="0" value="${p?.goals?.p??170}"></div>
+      <div><label>Жиры, г</label><input name="f" type="number" min="0" value="${p?.goals?.f??65}"></div>
+      <div><label>Углеводы, г</label><input name="c" type="number" min="0" value="${p?.goals?.c??200}"></div>
+    </div>
+    <button type="submit">Сохранить</button>
+  </form>`;
+  $('prf').onsubmit=e=>{
+    e.preventDefault();
+    const d=Object.fromEntries(new FormData(e.target));
+    const obj={
+      id:p?.id||uid(),
+      name:d.name.trim(),
+      goals:{p:num(d.p),f:num(d.f),c:num(d.c)}
+    };
+    if(p) db.profiles=db.profiles.map(x=>x.id===p.id?obj:x);
+    else {
+      db.profiles.push(obj);
+      if(!db.water[obj.id]) db.water[obj.id]={};
+    }
+    save(); $('dlg').close(); renderProfileList(); renderProfileSwitch(); renderHome(); fillGoals();
+    toast('Профиль сохранён');
+  };
+  $('dlg').showModal();
+}
+function delProfile(id){
+  if(db.profiles.length<=1){ toast('Нельзя удалить последний профиль'); return; }
+  const p=db.profiles.find(x=>x.id===id); if(!p) return;
+  if(!confirm('Удалить профиль «'+p.name+'»? Его записи дневника и вода будут удалены.')) return;
+  db.profiles=db.profiles.filter(x=>x.id!==id);
+  db.diary=db.diary.filter(x=>x.profileId!==id);
+  delete db.water[id];
+  if(db.activeProfile===id) db.activeProfile=db.profiles[0].id;
+  save(); renderProfileList(); renderProfileSwitch(); renderHome(); fillGoals();
+  toast('Профиль удалён');
+}
+
+/* ============ ЭКСПОРТ / ИМПОРТ ============ */
+function exportData(){
+  const blob=new Blob([JSON.stringify(db,null,2)],{type:'application/json'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+  a.download='kbzhu-ai-'+today()+'.json'; a.click(); URL.revokeObjectURL(a.href);
+  $('backupInfo').textContent='Копия сохранена.';
+}
+function exportCSV(){
+  const rows=[['Дата','Профиль','Приём','Продукт','г','Ккал','Б','Ж','У','Партия']];
+  const profName=id=>db.profiles.find(p=>p.id===id)?.name||id;
+  [...db.diary].sort((a,b)=>(a.date||'').localeCompare(b.date||'')).forEach(x=>{
+    rows.push([x.date,profName(x.profileId),x.meal,x.name,fmt(x.grams),fmt(x.kcal),fmt(x.p),fmt(x.f),fmt(x.c),x.batchDate||'']);
+  });
+  const csv=rows.map(r=>r.map(v=>'"'+String(v??'').replace(/"/g,'""')+'"').join(';')).join('\n');
+  const blob=new Blob(['\ufeff'+csv],{type:'text/csv;charset=utf-8'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+  a.download='kbzhu-diary-'+today()+'.csv'; a.click(); URL.revokeObjectURL(a.href);
+  $('backupInfo').textContent='CSV дневника сохранён.';
+}
+function importData(e){
+  const f=e.target.files[0]; if(!f) return;
+  const r=new FileReader();
+  r.onload=()=>{
+    try{
+      const x=JSON.parse(r.result);
+      if(!Array.isArray(x.products)||!Array.isArray(x.diary)) throw Error('bad format');
+      const m=Object.assign(clone(defaults),x);
+      m.profiles=Array.isArray(x.profiles)&&x.profiles.length?x.profiles:[{id:'u1',name:'Я',goals:x.goals||clone(defaults.profiles[0].goals)}];
+      m.products=m.products.map(p=>({...p,batches:Array.isArray(p.batches)?p.batches:[],activeBatchId:p.activeBatchId||null}));
+      m.diary=m.diary.map(d=>({...d,profileId:d.profileId||m.profiles[0].id}));
+      m.water=(x.water&&typeof x.water==='object')?x.water:{};
+      m.profiles.forEach(p=>{ if(!m.water[p.id]) m.water[p.id]={}; });
+      m.activeProfile=m.profiles.find(p=>p.id===x.activeProfile)?x.activeProfile:m.profiles[0].id;
+      m.settings=Object.assign(clone(defaults.settings),x.settings||{});
+      db=m; save();
+      applyTheme(db.settings.theme||'dark');
+      renderProfileSwitch(); renderHome(); renderCatalog(); fillGoals(); renderProfileList();
+      $('backupInfo').textContent='Копия восстановлена.';
+      toast('Данные восстановлены');
+    }catch(err){ alert('Файл не похож на резервную копию КБЖУ AI.'); }
+  };
+  r.readAsText(f); e.target.value='';
+}
+function clearDiary(){
+  if(!confirm('Удалить все записи дневника текущего профиля? Каталог, партии и цели останутся.')) return;
+  db.diary=db.diary.filter(x=>x.profileId!==db.activeProfile);
+  save(); renderHome(); toast('Дневник профиля очищен');
+}
+function resetAll(){
+  if(!confirm('Сбросить ВСЁ к демо-данным? Все профили, записи, партии и каталог будут заменены.')) return;
+  if(!confirm('Точно? Это необратимо. Лучше сначала сделайте экспорт JSON.')) return;
+  db=clone(defaults); save();
+  currentDay=today();
+  applyTheme(db.settings.theme||'dark');
+  renderProfileSwitch(); renderHome(); renderCatalog(); fillGoals(); renderProfileList();
+  $('backupInfo').textContent='Всё сброшено к демо.';
+  toast('Сброшено к демо');
+}
+
+/* ============ КАЛЕНДАРЬ ============ */
+function openCalendar(){
+  const d=new Date(currentDay+'T00:00:00');
+  renderCalendar(d.getFullYear(), d.getMonth());
+  $('calDlg').showModal();
+}
+function renderCalendar(year, month){
+  const first=new Date(year, month, 1);
+  const last=new Date(year, month+1, 0);
+  const startDay=(first.getDay()+6)%7; // Monday start
+  const days=last.getDate();
+  const todayStr=today();
+  let html=`<div class="row" style="margin-bottom:12px">
+    <button class="secondary" onclick="renderCalendar(${month===0?year-1:year},${month===0?11:month-1})">←</button>
+    <b>${first.toLocaleDateString('ru-RU',{month:'long',year:'numeric'})}</b>
+    <button class="secondary" onclick="renderCalendar(${month===11?year+1:year},${month===11?0:month+1})">→</button>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px;text-align:center;font-size:13px">
+    <div class="small">Пн</div><div class="small">Вт</div><div class="small">Ср</div><div class="small">Чт</div><div class="small">Пт</div><div class="small">Сб</div><div class="small">Вс</div>`;
+  for(let i=0;i<startDay;i++) html+='<div></div>';
+  for(let day=1;day<=days;day++){
+    const date=year+'-'+String(month+1).padStart(2,'0')+'-'+String(day).padStart(2,'0');
+    const isToday=date===todayStr;
+    const isCurrent=date===currentDay;
+    const hasData=db.diary.some(x=>x.date===date && x.profileId===db.activeProfile);
+    html+=`<button class="ghost" style="padding:8px 0;${isCurrent?'background:var(--accent);color:#fff':''}${isToday&&!isCurrent?';border-color:var(--accent)':''}" onclick="setDay('${date}');$('calDlg').close()">${day}${hasData?'<div style="font-size:8px;margin-top:2px">•</div>':''}</button>`;
+  }
+  html+='</div>';
+  $('calBody').innerHTML=html;
+}
+
+/* ============ ИНИЦИАЛИЗАЦИЯ ============ */
+applyTheme(db.settings.theme||'dark');
+renderProfileSwitch();
+renderHome();
+fillGoals();
+renderCatalog();
+renderProfileList();
+</script>
+</body>
+</html>
