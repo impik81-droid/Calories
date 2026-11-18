@@ -860,10 +860,13 @@ function openBatch(productId, batchId=null){
 function openAdd(meal='Завтрак',entry=null,preselect=null){
   const initId=entry?.productId||preselect||db.products[0]?.id||'';
   const initDate=entry?.date||currentDay;
+  const initCategory=db.products.find(x=>x.id===initId)?.category||'';
   $('dlgTitle').textContent=entry?'Изменить запись':'Добавить в дневник';
   $('dlgBody').innerHTML=`<form id="af">
     <label>Приём пищи</label>
     <select name="meal">${MEALS.map(x=>`<option ${meal===x?'selected':''}>${x}</option>`).join('')}</select>
+    <label>Категория продукта</label>
+    <select id="aCategory"><option value="">Все категории</option>${CATS.map(x=>`<option ${initCategory===x?'selected':''}>${x}</option>`).join('')}</select>
     <label>Продукт</label>
     <div class="searchbox"><input id="aSearch" placeholder="Поиск…" value="${esc(db.products.find(p=>p.id===initId)?.name||'')}" autocomplete="off"></div>
     <div class="prodlist" id="aList"></div>
@@ -880,12 +883,13 @@ function openAdd(meal='Завтрак',entry=null,preselect=null){
     <button type="submit">Сохранить запись</button>
   </form>`;
 
-  const sel=$('aProduct'), searchInput=$('aSearch'), listEl=$('aList');
+  const sel=$('aProduct'), categorySelect=$('aCategory'), searchInput=$('aSearch'), listEl=$('aList');
   sel.value=initId;
 
   function drawList(){
     const q=searchInput.value.toLowerCase().trim();
-    const arr=db.products.filter(p=>((p.name||'')+' '+(p.brand||'')).toLowerCase().includes(q));
+    const cat=categorySelect.value;
+    const arr=db.products.filter(p=>(!cat||p.category===cat)&&((p.name||'')+' '+(p.brand||'')).toLowerCase().includes(q));
     if(!arr.length){ listEl.innerHTML='<div class="small" style="padding:10px">Ничего не найдено</div>'; return; }
     listEl.innerHTML=arr.slice(0,30).map(p=>{
       const b=activeBatch(p);
@@ -903,6 +907,7 @@ function openAdd(meal='Завтрак',entry=null,preselect=null){
     $('preview').innerHTML=`${fmt(en.k*f)} ккал · Б ${fmt(en.p*f)} · Ж ${fmt(en.f*f)} · У ${fmt(en.c*f)} на порцию${tail}`;
   }
   searchInput.oninput=drawList;
+  categorySelect.onchange=()=>{ const p=db.products.find(x=>x.id===sel.value); if(p&&categorySelect.value&&p.category!==categorySelect.value){ sel.value=''; searchInput.value=''; } drawList(); preview(); };
   listEl.onclick=e=>{
     const it=e.target.closest('[data-id]'); if(!it) return;
     sel.value=it.dataset.id; searchInput.value=db.products.find(p=>p.id===it.dataset.id)?.name||'';
