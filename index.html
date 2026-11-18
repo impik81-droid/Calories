@@ -8,6 +8,7 @@
 <meta name="apple-mobile-web-app-title" content="КБЖУ AI">
 <title>КБЖУ AI</title>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <style>
 :root{--bg:#0c0f16;--panel:#151a25;--panel2:#1b2230;--line:#293244;--txt:#f4f6fb;--muted:#9aa6b8;--accent:#9b8cff;--green:#55d6a0;--orange:#ffbd69;--red:#ff7777;--shadow:#0002;--blue:#65c8ef}
 body.light{--bg:#f5f6fb;--panel:#ffffff;--panel2:#eef1f8;--line:#d8dee9;--txt:#151a25;--muted:#667085;--accent:#6b5cff;--shadow:#0001}
@@ -139,7 +140,7 @@ dialog::backdrop{background:#000a;backdrop-filter:blur(3px)}
 <div id="meals"></div>
 </section>
 <section id="catalog" hidden>
-<div class="row"><h2>Каталог продуктов</h2><button onclick="openProduct()">＋ Продукт</button></div>
+<div class="row"><h2>Каталог продуктов</h2><div class="actions"><button class="secondary" onclick="openBarcodeProduct()">▣ Штрихкод</button><button onclick="openProduct()">＋ Продукт</button></div></div>
 <div class="card">
 <input id="search" placeholder="Поиск: название или бренд" oninput="renderCatalog()">
 <div class="formgrid">
@@ -524,15 +525,24 @@ function renderCatalog(){
 }
 
 /* ============ ПРОДУКТ: ФОРМА (с OCR) ============ */
+let barcodeScanner=null;
+
 function productForm(p={}){
   $('dlgTitle').textContent=p.id?'Изменить продукт':'Новый продукт';
   $('dlgBody').innerHTML=`<form id="pf">
     <div class="actions" style="margin-bottom:12px">
+      <button type="button" class="secondary" onclick="startBarcodeScanner()">▣ Сканировать штрихкод</button>
       <button type="button" class="secondary" onclick="document.getElementById('ocrFile').click()">Сканировать этикетку</button>
       <input type="file" id="ocrFile" accept="image/*" hidden>
     </div>
+    <div id="barcodePanel" class="card" hidden style="margin:8px 0;padding:10px">
+      <div class="row"><b>Наведите камеру на штрихкод</b><button type="button" class="ghost" onclick="stopBarcodeScanner()">Закрыть</button></div>
+      <div id="barcodeReader" style="margin-top:8px"></div>
+      <div class="ocr-status" id="barcodeStatus">Запрашиваю доступ к камере…</div>
+    </div>
     <div class="ocr-status" id="ocrStatus"></div>
-    <label>Название</label><input name="name" required value="${esc(p.name||'')}">
+    <input type="hidden" name="barcode" value="${esc(p.barcode||'')}">
+    <label>Название</label><input name="name" required value="${esc(p.name||'')}" >
     <div class="formgrid">
       <div><label>Бренд</label><input name="brand" value="${esc(p.brand||'')}"></div>
       <div><label>Категория</label><select name="category">${CATS.map(x=>`<option ${p.category===x?'selected':''}>${x}</option>`).join('')}</select></div>
@@ -566,7 +576,7 @@ function productForm(p={}){
   $('pf').onsubmit=e=>{
     e.preventDefault();
     const d=Object.fromEntries(new FormData(e.target));
-    const obj={...p,id:p.id||uid(),name:d.name.trim(),brand:d.brand.trim(),category:d.category,state:d.state,k:num(d.k),p:num(d.p),f:num(d.f),c:num(d.c),batches:p.batches||[],activeBatchId:p.activeBatchId||null};
+    const obj={...p,id:p.id||uid(),name:d.name.trim(),brand:d.brand.trim(),barcode:(d.barcode||'').trim(),category:d.category,state:d.state,k:num(d.k),p:num(d.p),f:num(d.f),c:num(d.c),batches:p.batches||[],activeBatchId:p.activeBatchId||null};
     const dup=db.products.find(x=>x.id!==obj.id && x.name.toLowerCase()===obj.name.toLowerCase() && (x.brand||'').toLowerCase()===(obj.brand||'').toLowerCase());
     if(dup && !confirm('Похожий продукт уже есть: «'+dup.name+'». Всё равно сохранить?')) return;
     if(p.id) db.products=db.products.map(x=>x.id===p.id?obj:x);
@@ -596,6 +606,87 @@ function fillFromOCR(text) {
   const cMatch = text.match(/углев[а-я]*\s*[:\-]?\s*(\d+[\.,]?\d*)/i);
   if (cMatch) form.c.value = parseFloat(cMatch[1].replace(',', '.'));
 }
+
+async function stopBarcodeScanner(){
+  if (barcodeScanner) {
+    try { await barcodeScanner.stop(); } catch (e) { console.warn('barcode stop', e); }
+    try { barcodeScanner.clear(); } catch (e) {}
+    barcodeScanner=null;
+  }
+  const panel=$('barcodePanel');
+  if(panel) panel.hidden=true;
+}
+
+async function startBarcodeScanner(){
+  const panel=$('barcodePanel'), status=$('barcodeStatus');
+  if(!panel||!status) return;
+  if(typeof Html5Qrcode==='undefined') { status.textContent='Сканер не загрузился. Проверьте интернет-соединение.'; panel.hidden=false; return; }
+  panel.hidden=false;
+  status.textContent='Запрашиваю доступ к камере…';
+  await stopBarcodeScanner();
+  panel.hidden=false;
+  barcodeScanner=new Html5Qrcode('barcodeReader');
+  try {
+    await barcodeScanner.start(
+      {facingMode:'environment'},
+      {fps:10, qrbox:{width:280,height:160}, aspectRatio:1.777},
+      async code => {
+        status.textContent='Штрихкод '+code+' найден. Ищу продукт…';
+        await stopBarcodeScanner();
+        await lookupBarcode(code);
+      },
+      () => {}
+    );
+    status.textContent='Наведите камеру на EAN-8, EAN-13 или UPC-код.';
+  } catch (err) {
+    console.error('barcode start',err);
+    status.textContent='Не удалось открыть камеру. Разрешите доступ к камере и используйте HTTPS.';
+    await stopBarcodeScanner();
+  }
+}
+
+function openBarcodeProduct(){ productForm(); setTimeout(startBarcodeScanner,120); }
+
+async function lookupBarcode(code){
+  const status=$('ocrStatus');
+  if(status) status.textContent='Получаю данные продукта…';
+  try {
+    const fields='code,product_name,product_name_ru,brands,categories_tags,nutriments,serving_size';
+    const r=await fetch('https://world.openfoodfacts.org/api/v2/product/'+encodeURIComponent(code)+'.json?fields='+fields,{headers:{Accept:'application/json'}});
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    const j=await r.json();
+    if(!j.product || j.status===0) {
+      if(status) status.textContent='Продукт не найден. Заполните поля вручную.';
+      const f=$('pf'); if(f) f.barcode.value=code;
+      return;
+    }
+    const product=j.product, n=product.nutriments||{}, f=$('pf');
+    if(!f) return;
+    const kcal=n['energy-kcal_100g'] ?? (n['energy_100g'] ? Number(n['energy_100g'])/4.184 : '');
+    f.barcode.value=code;
+    f.name.value=product.product_name_ru || product.product_name || '';
+    f.brand.value=product.brands || '';
+    if(kcal!=='') f.k.value=roundNutrition(kcal);
+    f.p.value=roundNutrition(n.proteins_100g);
+    f.f.value=roundNutrition(n.fat_100g);
+    f.c.value=roundNutrition(n.carbohydrates_100g);
+    const category=guessCategory(product.categories_tags||[]);
+    if(category) f.category.value=category;
+    if(status) status.textContent='Данные найдены. Проверьте их и нажмите «Сохранить продукт».';
+  } catch(err) {
+    console.error('barcode lookup',err);
+    if(status) status.textContent='Не удалось найти продукт по штрихкоду. Заполните поля вручную.';
+  }
+}
+
+function roundNutrition(v){ const n=Number(v); return Number.isFinite(n)?Math.round(n*10)/10:0; }
+function guessCategory(tags){
+  const text=tags.join(' ').toLowerCase();
+  const map=[['meat','Мясо'],['fish','Рыба'],['cereal','Крупы'],['pasta','Макароны'],['milk','Молочные'],['vegetable','Овощи'],['fruit','Фрукты']];
+  return (map.find(([key])=>text.includes(key))||[])[1]||'';
+}
+
+$('dlg').addEventListener('close',()=>{ stopBarcodeScanner(); });
 
 function openProduct(){ productForm(); }
 function editProduct(id){ const p=db.products.find(x=>x.id===id); if(p) productForm(p); }
