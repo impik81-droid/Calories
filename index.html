@@ -217,7 +217,7 @@ dialog::backdrop{background:#000a;backdrop-filter:blur(3px)}
 /* ============ БАЗА ============ */
 const KEY='kbzhu_ai_v06';
 const MEALS=['Завтрак','Обед','Ужин','Перекус'];
-const CATS=['Мясо','Рыба','Крупы','Макароны','Молочные','Овощи','Фрукты','Другое'];
+const CATS=['Мясо','Птица','Рыба','Морепродукты','Яйца','Молочные','Сыры','Крупы','Макароны','Хлеб и выпечка','Бобовые','Овощи','Фрукты','Ягоды','Орехи и семена','Масла и жиры','Соусы','Консервы','Сладости','Напитки','Спортивное питание','Готовые продукты','Другое'];
 const STATES=['Сухой','Сырой','Готовый'];
 
 const defaults={
@@ -743,7 +743,7 @@ async function lookupBarcode(code){
 function roundNutrition(v){ const n=Number(v); return Number.isFinite(n)?Math.round(n*10)/10:0; }
 function guessCategory(tags){
   const text=tags.join(' ').toLowerCase();
-  const map=[['meat','Мясо'],['fish','Рыба'],['cereal','Крупы'],['pasta','Макароны'],['milk','Молочные'],['vegetable','Овощи'],['fruit','Фрукты']];
+  const map=[['poultry','Птица'],['chicken','Птица'],['turkey','Птица'],['seafood','Морепродукты'],['shellfish','Морепродукты'],['egg','Яйца'],['cheese','Сыры'],['meat','Мясо'],['fish','Рыба'],['cereal','Крупы'],['pasta','Макароны'],['bread','Хлеб и выпечка'],['bakery','Хлеб и выпечка'],['legume','Бобовые'],['nut','Орехи и семена'],['seed','Орехи и семена'],['oil','Масла и жиры'],['sauce','Соусы'],['canned','Консервы'],['candy','Сладости'],['chocolate','Сладости'],['beverage','Напитки'],['drink','Напитки'],['milk','Молочные'],['berry','Ягоды'],['vegetable','Овощи'],['fruit','Фрукты']];
   return (map.find(([key])=>text.includes(key))||[])[1]||'';
 }
 
