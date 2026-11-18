@@ -96,7 +96,7 @@ dialog::backdrop{background:#000a;backdrop-filter:blur(3px)}
 <div class="toprow">
 <div>
 <div class="brand">КБЖУ <span>AI</span></div>
-<div class="sub">Дневник питания · v0.6 · профили и партии</div>
+<div class="sub">Дневник питания · v0.7 · облако · <span id="syncState">☁️ …</span></div>
 </div>
 <div style="display:flex;gap:8px;align-items:center">
 <div class="profileSwitch" id="profileSwitch"></div>
@@ -178,7 +178,7 @@ dialog::backdrop{background:#000a;backdrop-filter:blur(3px)}
 <section id="backup" hidden>
 <div class="card">
 <h2>Резервная копия</h2>
-<p class="small">Сохраняет профили, каталог, партии, цели и дневник в JSON. Данные хранятся в браузере на этом устройстве.</p>
+<p class="small">Сохраняет профили, каталог, партии, цели и дневник в JSON. Данные синхронизируются с облаком; копия нужна на случай ошибок. Импорт не удаляет продукты, которых нет в файле.</p>
 <div class="actions">
 <button onclick="exportData()">Экспорт JSON</button>
 <button class="secondary" onclick="document.getElementById('importFile').click()">Импорт JSON</button>
@@ -190,7 +190,7 @@ dialog::backdrop{background:#000a;backdrop-filter:blur(3px)}
 <h3>Опасная зона</h3>
 <div class="actions">
 <button class="danger" onclick="clearDiary()">Очистить дневник профиля</button>
-<button class="danger" onclick="resetAll()">Сбросить всё к демо</button>
+<button class="danger" onclick="resetAll()">Сбросить мои данные</button>
 </div>
 </div>
 </section>
@@ -226,6 +226,8 @@ const defaults={
     {id:'p5',name:'Творог 5%',brand:'',category:'Молочные',state:'Готовый',k:121,p:17,f:5,c:1.8,batches:[],activeBatchId:null}
   ],
   diary:[],
+  tomb:[],
+  userU:0,
   water:{u1:{},u2:{}},
   settings:{theme:'dark',collapsed:{},lastDate:null}
 };
@@ -235,12 +237,13 @@ const uid=()=> (typeof crypto!=='undefined' && crypto.randomUUID) ? crypto.rando
 const $=id=>document.getElementById(id);
 const num=v=>Math.max(0,Number(v)||0);
 const fmt=v=>(Math.round(v*10)/10).toLocaleString('ru-RU');
-const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&','<':'<','>':'>','"':'"',"'":'&#39;'}[c]));
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const kcal=g=>g.p*4+g.c*4+g.f*9;
 const isoDate=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
 const today=()=>isoDate(new Date());
 
 let db=load();
+db.tomb=Array.isArray(db.tomb)?db.tomb:[]; db.userU=db.userU||0;
 let currentDay=db.settings.lastDate||today();
 
 function load(){
@@ -288,12 +291,100 @@ function load(){
     return m;
   }catch(e){ console.warn('load',e); return clone(defaults); }
 }
-function save(){
+function persist(){
   try{ localStorage.setItem(KEY,JSON.stringify(db)); }
   catch(e){ toast('Хранилище переполнено'); console.error(e); }
 }
+function save(){ stampProducts(); stampUser(); persist(); scheduleSync(); }
 let toastT;
 function toast(s){ const t=$('toast'); t.textContent=s; t.style.display='block'; clearTimeout(toastT); toastT=setTimeout(()=>t.style.display='none',2200); }
+
+
+/* ============ ОБЛАКО (Cloudflare Pages Functions + D1) ============ */
+const SNAP_KEY='kbzhu_ai_snap';
+const snapJson=p=>JSON.stringify({...p,u:0});
+let snap=(()=>{
+  try{ const x=JSON.parse(localStorage.getItem(SNAP_KEY)||'null'); if(x&&typeof x==='object') return x; }catch(e){}
+  const o={}; db.products.forEach(p=>o[p.id]=snapJson(p)); return o;
+})();
+const userPart=()=>({profiles:db.profiles,activeProfile:db.activeProfile,diary:db.diary,water:db.water});
+let lastUserStr=JSON.stringify(userPart());
+function saveSnap(){ try{ localStorage.setItem(SNAP_KEY,JSON.stringify(snap)); }catch(e){} }
+function stampProducts(){
+  const now=Date.now(), cur=new Set();
+  db.products.forEach(p=>{
+    cur.add(p.id);
+    const j=snapJson(p);
+    if(snap[p.id]!==j){ p.u=now; snap[p.id]=j; }
+  });
+  Object.keys(snap).forEach(id=>{ if(!cur.has(id)){ db.tomb.push({id,u:now}); delete snap[id]; } });
+  saveSnap();
+}
+function stampUser(){
+  const j=JSON.stringify(userPart());
+  if(j!==lastUserStr){ lastUserStr=j; db.userU=Date.now(); }
+}
+let syncing=false, again=false, syncT=null, lastEmail='';
+function setSync(st){
+  const el=$('syncState'); if(!el) return;
+  el.textContent=st==='ok'?'☁️ синхронизировано'+(lastEmail?' · '+lastEmail:'')
+    :st==='busy'?'☁️ синхронизация…'
+    :'☁️ нет связи или нужен вход — данные пока на устройстве';
+}
+function scheduleSync(delay=800){ clearTimeout(syncT); syncT=setTimeout(syncNow,delay); }
+async function syncNow(){
+  if(syncing){ again=true; return; }
+  syncing=true; setSync('busy');
+  try{
+    const body={products:db.products,tomb:db.tomb,user:userPart(),userU:db.userU};
+    const sent=body.tomb.length;
+    const r=await fetch('/api/sync',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    if(!r.ok) throw new Error('http '+r.status);
+    if(!(r.headers.get('content-type')||'').includes('json')) throw new Error('not json');
+    const j=await r.json();
+    db.tomb=db.tomb.slice(sent);
+    lastEmail=j.email||'';
+    applyServer(j);
+    setSync('ok');
+  }catch(e){ console.warn('sync',e); setSync('off'); }
+  finally{ syncing=false; if(again){ again=false; scheduleSync(50); } }
+}
+function applyServer(j){
+  const local=new Map(db.products.map(p=>[p.id,p]));
+  (j.products||[]).forEach(row=>{
+    const l=local.get(row.id);
+    if(row.deleted){ if(l&&(l.u||0)<=row.u) local.delete(row.id); return; }
+    if(l&&(l.u||0)>row.u) return;
+    let sp; try{ sp=JSON.parse(row.data); }catch(e){ return; }
+    sp.u=row.u;
+    sp.batches=Array.isArray(sp.batches)?sp.batches:[];
+    sp.activeBatchId=sp.activeBatchId||null;
+    local.set(row.id,sp);
+  });
+  db.products=[...local.values()];
+  snap={}; db.products.forEach(p=>snap[p.id]=snapJson(p)); saveSnap();
+
+  const u=j.user;
+  if(u && j.userU>(db.userU||0) && Array.isArray(u.profiles) && u.profiles.length){
+    if((db.userU||0)===0 && db.diary.length &&
+       !confirm('На сервере уже есть данные вашего аккаунта. Заменить ими данные этого устройства?\n\nОтмена — оставить данные этого устройства и отправить их на сервер.')){
+      db.userU=Date.now(); scheduleSync(50);
+    }else{
+      db.profiles=u.profiles;
+      db.diary=Array.isArray(u.diary)?u.diary:[];
+      db.water=(u.water&&typeof u.water==='object')?u.water:{};
+      db.profiles.forEach(p=>{ if(!db.water[p.id]) db.water[p.id]={}; });
+      db.activeProfile=db.profiles.find(p=>p.id===u.activeProfile)?u.activeProfile:db.profiles[0].id;
+      db.userU=j.userU;
+      lastUserStr=JSON.stringify(userPart());
+    }
+  }
+  persist();
+  renderProfileSwitch(); renderHome(); renderCatalog(); fillGoals(); renderProfileList();
+}
+document.addEventListener('visibilitychange',()=>{ if(!document.hidden) scheduleSync(100); });
+window.addEventListener('online',()=>scheduleSync(100));
+setInterval(()=>{ if(!document.hidden) scheduleSync(100); },60000);
 
 /* ============ ПРОФИЛИ ============ */
 function activeProfile(){ return db.profiles.find(p=>p.id===db.activeProfile)||db.profiles[0]; }
@@ -804,6 +895,9 @@ function importData(e){
       m.profiles.forEach(p=>{ if(!m.water[p.id]) m.water[p.id]={}; });
       m.activeProfile=m.profiles.find(p=>p.id===x.activeProfile)?x.activeProfile:m.profiles[0].id;
       m.settings=Object.assign(clone(defaults.settings),x.settings||{});
+      const keep=db.products.filter(p=>!m.products.some(q=>q.id===p.id));
+      m.products=[...m.products,...keep];
+      m.tomb=db.tomb||[]; m.userU=db.userU||0;
       db=m; save();
       applyTheme(db.settings.theme||'dark');
       renderProfileSwitch(); renderHome(); renderCatalog(); fillGoals(); renderProfileList();
@@ -819,14 +913,15 @@ function clearDiary(){
   save(); renderHome(); toast('Дневник профиля очищен');
 }
 function resetAll(){
-  if(!confirm('Сбросить ВСЁ к демо-данным? Все профили, записи, партии и каталог будут заменены.')) return;
+  if(!confirm('Сбросить ваши профили, дневник и воду? Общий каталог продуктов и партии останутся.')) return;
   if(!confirm('Точно? Это необратимо. Лучше сначала сделайте экспорт JSON.')) return;
-  db=clone(defaults); save();
+  const keepP=db.products, keepT=db.tomb, keepU=db.userU;
+  db=clone(defaults); db.products=keepP; db.tomb=keepT; db.userU=keepU; save();
   currentDay=today();
   applyTheme(db.settings.theme||'dark');
   renderProfileSwitch(); renderHome(); renderCatalog(); fillGoals(); renderProfileList();
-  $('backupInfo').textContent='Всё сброшено к демо.';
-  toast('Сброшено к демо');
+  $('backupInfo').textContent='Ваши данные сброшены.';
+  toast('Данные сброшены');
 }
 
 /* ============ КАЛЕНДАРЬ ============ */
@@ -867,6 +962,7 @@ renderHome();
 fillGoals();
 renderCatalog();
 renderProfileList();
+scheduleSync(100);
 </script>
 </body>
 </html>
