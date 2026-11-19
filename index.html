@@ -111,6 +111,7 @@ dialog::backdrop{background:#000a;backdrop-filter:blur(3px)}
 <button class="tab" data-tab="catalog">Продукты</button>
 <button class="tab" data-tab="dishes">Блюда</button>
 <button class="tab" data-tab="goals">Цели</button>
+<button class="tab" data-tab="stats">Статистика</button>
 <button class="tab" data-tab="backup">Данные</button>
 </nav>
 <section id="home">
@@ -187,6 +188,20 @@ dialog::backdrop{background:#000a;backdrop-filter:blur(3px)}
 <button class="secondary" onclick="openProfile()" style="margin-top:8px">＋ Добавить профиль</button>
 </div>
 </section>
+<section id="stats" hidden>
+<div class="row"><h2>Статистика</h2><button class="secondary" onclick="renderStats()">Обновить</button></div>
+<div class="card">
+<div class="row"><div><b>Последние 7 дней</b><div class="small" id="statsRange"></div></div><span class="pill" id="statsProfile"></span></div>
+<div class="grid" id="statsTotals"></div>
+<div id="statsChart" style="margin-top:14px"></div>
+</div>
+<div class="card">
+<h3>История веса</h3>
+<div class="formgrid"><div><label>Дата</label><input id="weightDate" type="date"></div><div><label>Вес, кг</label><input id="weightValue" type="number" min="0.1" step="0.1" placeholder="например, 75.5"></div></div>
+<button onclick="addWeight()">Сохранить вес</button>
+<div id="weightHistory" style="margin-top:12px"></div>
+</div>
+</section>
 <section id="backup" hidden>
 <div class="card">
 <h2>Резервная копия</h2>
@@ -242,6 +257,7 @@ const defaults={
   tomb:[],
   userU:0,
   water:{u1:{},u2:{}},
+  weight:{u1:[],u2:[]},
   settings:{theme:'dark',collapsed:{},lastDate:null}
 };
 
@@ -285,6 +301,7 @@ function load(){
           dishes:Array.isArray(old.dishes)?old.dishes:[],
           diary,
           water:{u1:(old.water&&old.water.u1)||old.water||{}},
+          weight:{u1:Array.isArray(old.weight)?old.weight:[]},
           settings:Object.assign(clone(defaults.settings),old.settings||{})
         };
       }
@@ -300,7 +317,8 @@ function load(){
     }));
     m.diary=(Array.isArray(raw.diary)?raw.diary:[]).map(d=>({...d,profileId:d.profileId||m.activeProfile||'u1'}));
     m.water=(raw.water&&typeof raw.water==='object')?raw.water:{};
-    m.profiles.forEach(p=>{ if(!m.water[p.id]) m.water[p.id]={}; });
+    m.weight=(raw.weight&&typeof raw.weight==='object')?raw.weight:{};
+    m.profiles.forEach(p=>{ if(!m.water[p.id]) m.water[p.id]={}; if(!Array.isArray(m.weight[p.id])) m.weight[p.id]=[]; });
     m.settings=Object.assign(clone(defaults.settings),raw.settings||{});
     if(!m.profiles.find(p=>p.id===m.activeProfile)) m.activeProfile=m.profiles[0].id;
     return m;
@@ -322,7 +340,7 @@ let snap=(()=>{
   try{ const x=JSON.parse(localStorage.getItem(SNAP_KEY)||'null'); if(x&&typeof x==='object') return x; }catch(e){}
   const o={}; db.products.forEach(p=>o[p.id]=snapJson(p)); return o;
 })();
-const userPart=()=>({profiles:db.profiles,activeProfile:db.activeProfile,diary:db.diary,dishes:db.dishes,water:db.water});
+const userPart=()=>({profiles:db.profiles,activeProfile:db.activeProfile,diary:db.diary,dishes:db.dishes,water:db.water,weight:db.weight});
 let lastUserStr=JSON.stringify(userPart());
 function saveSnap(){ try{ localStorage.setItem(SNAP_KEY,JSON.stringify(snap)); }catch(e){} }
 function stampProducts(){
@@ -427,10 +445,11 @@ $('themeBtn').onclick=()=>applyTheme(db.settings.theme==='light'?'dark':'light')
 /* ============ ТАБЫ ============ */
 document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{
   document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('active',x===b));
-  ['home','catalog','dishes','goals','backup'].forEach(x=>$(x).hidden=x!==b.dataset.tab);
+  ['home','catalog','dishes','goals','stats','backup'].forEach(x=>$(x).hidden=x!==b.dataset.tab);
   if(b.dataset.tab==='catalog') renderCatalog();
   if(b.dataset.tab==='dishes') renderDishes();
   if(b.dataset.tab==='goals'){ fillGoals(); renderProfileList(); }
+  if(b.dataset.tab==='stats'){ renderStats(); }
 });
 
 /* ============ ДЕНЬ ============ */
@@ -951,6 +970,38 @@ function duplicateEntry(id){
   db.diary.push(copy); save(); renderHome(); toast('Запись продублирована');
 }
 
+/* ============ СТАТИСТИКА И ВЕС ============ */
+function statsDays(){
+  const out=[]; const end=new Date(currentDay+'T00:00:00');
+  for(let i=6;i>=0;i--){ const d=new Date(end); d.setDate(end.getDate()-i); out.push(isoDate(d)); }
+  return out;
+}
+function rowsForDate(date){ return db.diary.filter(x=>x.date===date&&x.profileId===db.activeProfile); }
+function renderStats(){
+  const prof=activeProfile(), days=statsDays(), values=days.map(date=>({date,...sum(rowsForDate(date)),water:(db.water[db.activeProfile]||{})[date]||0}));
+  const totals=values.reduce((a,x)=>({k:a.k+x.k,p:a.p+x.p,f:a.f+x.f,c:a.c+x.c,water:a.water+x.water}),{k:0,p:0,f:0,c:0,water:0});
+  const avg=totals.k/7, goal=kcal(prof.goals);
+  $('statsProfile').textContent=prof.name;
+  $('statsRange').textContent=`${new Date(days[0]+'T00:00:00').toLocaleDateString('ru-RU',{day:'numeric',month:'short'})} — ${new Date(days[6]+'T00:00:00').toLocaleDateString('ru-RU',{day:'numeric',month:'short'})}`;
+  $('statsTotals').innerHTML=[['Среднее ккал',avg,'ккал'],['Среднее Б',totals.p/7,'г'],['Среднее Ж',totals.f/7,'г'],['Среднее У',totals.c/7,'г']].map(x=>`<div class="metric"><span>${x[0]}</span><b>${fmt(x[1])}</b><span>${x[2]}</span></div>`).join('')+`<div class="metric"><span>Вода</span><b>${fmt(totals.water)}</b><span>стаканов</span></div><div class="metric"><span>Дни в цели</span><b>${values.filter(x=>x.k>0&&x.k<=goal*1.1).length}</b><span>из 7</span></div>`;
+  const max=Math.max(goal,...values.map(x=>x.k),1);
+  $('statsChart').innerHTML=values.map(x=>{ const h=Math.max(4,Math.round(x.k/max*150)); const day=new Date(x.date+'T00:00:00').toLocaleDateString('ru-RU',{weekday:'short'}); return `<div style="display:inline-flex;vertical-align:bottom;flex-direction:column;align-items:center;width:13%;gap:4px"><span class="small">${fmt(x.k)}</span><div style="height:150px;display:flex;align-items:flex-end;width:100%"><i style="display:block;width:100%;height:${h}px;background:var(--accent);border-radius:8px 8px 2px 2px"></i></div><span class="small">${day}</span></div>`; }).join('');
+  $('weightDate').value=currentDay; renderWeightHistory();
+}
+function renderWeightHistory(){
+  const items=[...(db.weight[db.activeProfile]||[])].sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+  $('weightHistory').innerHTML=items.length?items.slice(0,12).map(x=>`<div class="batch-item"><div class="info"><b>${fmt(x.value)} кг</b><div class="small">${new Date(x.date+'T00:00:00').toLocaleDateString('ru-RU',{day:'numeric',month:'long',year:'numeric'})}</div></div><button class="danger" onclick="deleteWeight('${x.id}')">×</button></div>`).join(''):'<div class="small">История пока пустая.</div>';
+}
+function addWeight(){
+  const date=$('weightDate').value||currentDay, value=num($('weightValue').value);
+  if(!value){toast('Введите вес');return;}
+  db.weight[db.activeProfile]=db.weight[db.activeProfile]||[];
+  const old=db.weight[db.activeProfile].find(x=>x.date===date);
+  if(old) old.value=value; else db.weight[db.activeProfile].push({id:uid(),date,value});
+  save(); $('weightValue').value=''; renderStats(); toast('Вес сохранён');
+}
+function deleteWeight(id){ db.weight[db.activeProfile]=(db.weight[db.activeProfile]||[]).filter(x=>x.id!==id); save(); renderStats(); }
+
 /* ============ ЦЕЛИ ============ */
 function fillGoals(){
   const g=activeProfile().goals;
@@ -1003,6 +1054,7 @@ function openProfile(id=null){
     else {
       db.profiles.push(obj);
       if(!db.water[obj.id]) db.water[obj.id]={};
+      if(!db.weight[obj.id]) db.weight[obj.id]=[];
     }
     save(); $('dlg').close(); renderProfileList(); renderProfileSwitch(); renderHome(); fillGoals();
     toast('Профиль сохранён');
@@ -1016,6 +1068,7 @@ function delProfile(id){
   db.profiles=db.profiles.filter(x=>x.id!==id);
   db.diary=db.diary.filter(x=>x.profileId!==id);
   delete db.water[id];
+  delete db.weight[id];
   if(db.activeProfile===id) db.activeProfile=db.profiles[0].id;
   save(); renderProfileList(); renderProfileSwitch(); renderHome(); fillGoals();
   toast('Профиль удалён');
