@@ -466,7 +466,6 @@ function effectiveNutrition(product){
 function renderHome(){
   const prof=activeProfile();
   renderProfileSwitch();
-  $('homeProfilePill').textContent=prof.name;
   $('meals').innerHTML=MEALS.map(m=>{
     const arr=dayRows().filter(x=>x.meal===m),t=sum(arr);
     return `<div class="meal">
