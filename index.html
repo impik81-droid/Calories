@@ -512,14 +512,13 @@ function renderHome(){
 
   $('meals').innerHTML=MEALS.map(m=>{
     const arr=dayRows().filter(x=>x.meal===m),t=sum(arr);
-    const collapsed=!!db.settings.collapsed[m];
-    return `<div class="meal ${collapsed?'collapsed':''}">
+    return `<div class="meal">
       <div class="row">
-        <div style="cursor:pointer;flex:1" onclick="toggleMeal('${m}')">
-          <h3>${collapsed?'▸':'▾'} ${m}</h3>
+        <div style="flex:1">
+          <h3>${m}</h3>
           <div class="small">${arr.length} записей · ${fmt(t.k)} ккал · Б ${fmt(t.p)} / Ж ${fmt(t.f)} / У ${fmt(t.c)}</div>
         </div>
-        <button class="secondary" onclick="openAdd('${m}')">＋</button>
+        <button class="secondary" onclick="openAdd('${m}')">＋ Добавить</button>
       </div>
       ${arr.map(x=>`<div class="entry"><div class="row"><div style="flex:1">
         <b>${esc(x.name)}</b> ${x.fromBatch?'<span class="pill batch">по партии</span>':''}
