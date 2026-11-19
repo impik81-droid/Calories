@@ -85,6 +85,9 @@ dialog::backdrop{background:#000a;backdrop-filter:blur(3px)}
 .batch-calc{background:var(--panel2);border-radius:12px;padding:12px;margin:10px 0;font-size:13px;line-height:1.6}
 .batch-calc b{color:var(--accent)}
 .ocr-status{font-size:13px;color:var(--muted);margin:8px 0}
+.today-hero{background:linear-gradient(145deg,color-mix(in srgb,var(--accent) 28%,var(--panel)),var(--panel2));border:1px solid color-mix(in srgb,var(--accent) 45%,var(--line));border-radius:22px;padding:18px;margin:0 0 12px;box-shadow:0 14px 36px var(--shadow)}
+.today-hero .hero-main{display:flex;align-items:center;gap:18px}.hero-ring{width:116px;height:116px;border-radius:50%;display:grid;place-items:center;background:conic-gradient(var(--accent) var(--ring),var(--line) 0);flex:none}.hero-ring::after{content:'';grid-area:1/1;width:88px;height:88px;border-radius:50%;background:var(--panel)}.hero-ring b,.hero-ring span{grid-area:1/1;z-index:1;text-align:center}.hero-ring b{font-size:22px}.hero-ring span{font-size:10px;color:var(--muted);margin-top:52px}.hero-kcal{font-size:30px;font-weight:800;line-height:1.05}.hero-kcal small{font-size:13px;font-weight:500;color:var(--muted)}.macro-strip{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:16px}.macro-strip div{background:color-mix(in srgb,var(--panel) 70%,transparent);border-radius:12px;padding:10px}.macro-strip b{display:block;font-size:16px;margin-top:3px}@media(max-width:560px){.today-hero .hero-main{gap:12px}.hero-ring{width:96px;height:96px}.hero-ring::after{width:72px;height:72px}.hero-kcal{font-size:25px}}
+
 
 @media(max-width:560px){
 .grid{grid-template-columns:repeat(2,1fr)}
@@ -116,7 +119,7 @@ dialog::backdrop{background:#000a;backdrop-filter:blur(3px)}
 <button class="tab" data-tab="backup">Данные</button>
 </nav>
 <section id="home">
-<div class="card" style="margin-top:0"><h2>Дневной итог</h2><div class="grid" id="homeTotals"></div><div id="homeProgress"></div></div>
+<div id="todayHero" class="today-hero"></div>
 <div class="row"><h2>Питание</h2><button onclick="openAdd()">＋ Добавить</button></div>
 <div id="meals"></div>
 </section>
@@ -468,9 +471,8 @@ function renderHome(){
   const prof=activeProfile();
   renderProfileSwitch();
   const s=sum(dayRows()),g=prof.goals,goalK=kcal(g);
-  const metrics=[['Калории',s.k,goalK,'ккал'],['Белки',s.p,g.p,'г'],['Жиры',s.f,g.f,'г'],['Углеводы',s.c,g.c,'г']];
-  $('homeTotals').innerHTML=metrics.map(a=>{const cls=pctClass(a[1],a[2]),w=Math.min(100,pct(a[1],a[2]));return `<div class="metric ${cls}"><span>${a[0]}</span><b>${fmt(a[1])}</b><span>из ${fmt(a[2])} ${a[3]}</span><div class="bar ${cls}"><i style="width:${w}%"></i></div></div>`;}).join('');
-  $('homeProgress').innerHTML=`<p class="small">Осталось: ${fmt(Math.max(0,goalK-s.k))} ккал · Б ${fmt(Math.max(0,g.p-s.p))} г · Ж ${fmt(Math.max(0,g.f-s.f))} г · У ${fmt(Math.max(0,g.c-s.c))} г</p>`;
+  const remain=Math.max(0,goalK-s.k), ring=Math.min(100,Math.round(pct(s.k,goalK)));
+  $('todayHero').innerHTML=`<div class="hero-main"><div class="hero-ring" style="--ring:${ring}%"><b>${fmt(remain)}</b><span>осталось ккал</span></div><div><div class="small">Калории за день</div><div class="hero-kcal">${fmt(s.k)} <small>из ${fmt(goalK)} ккал</small></div><div class="small">${ring}% дневной цели</div></div></div><div class="macro-strip"><div><span class="small">Белки</span><b>${fmt(s.p)} / ${fmt(g.p)} г</b></div><div><span class="small">Жиры</span><b>${fmt(s.f)} / ${fmt(g.f)} г</b></div><div><span class="small">Углеводы</span><b>${fmt(s.c)} / ${fmt(g.c)} г</b></div></div>`;
   $('meals').innerHTML=MEALS.map(m=>{
     const arr=dayRows().filter(x=>x.meal===m),t=sum(arr);
     return `<div class="meal">
