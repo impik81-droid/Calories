@@ -116,6 +116,7 @@ dialog::backdrop{background:#000a;backdrop-filter:blur(3px)}
 <button class="tab" data-tab="backup">Данные</button>
 </nav>
 <section id="home">
+<div class="card" style="margin-top:0"><h2>Дневной итог</h2><div class="grid" id="homeTotals"></div><div id="homeProgress"></div></div>
 <div class="row"><h2>Питание</h2><button onclick="openAdd()">＋ Добавить</button></div>
 <div id="meals"></div>
 </section>
@@ -466,6 +467,10 @@ function effectiveNutrition(product){
 function renderHome(){
   const prof=activeProfile();
   renderProfileSwitch();
+  const s=sum(dayRows()),g=prof.goals,goalK=kcal(g);
+  const metrics=[['Калории',s.k,goalK,'ккал'],['Белки',s.p,g.p,'г'],['Жиры',s.f,g.f,'г'],['Углеводы',s.c,g.c,'г']];
+  $('homeTotals').innerHTML=metrics.map(a=>{const cls=pctClass(a[1],a[2]),w=Math.min(100,pct(a[1],a[2]));return `<div class="metric ${cls}"><span>${a[0]}</span><b>${fmt(a[1])}</b><span>из ${fmt(a[2])} ${a[3]}</span><div class="bar ${cls}"><i style="width:${w}%"></i></div></div>`;}).join('');
+  $('homeProgress').innerHTML=`<p class="small">Осталось: ${fmt(Math.max(0,goalK-s.k))} ккал · Б ${fmt(Math.max(0,g.p-s.p))} г · Ж ${fmt(Math.max(0,g.f-s.f))} г · У ${fmt(Math.max(0,g.c-s.c))} г</p>`;
   $('meals').innerHTML=MEALS.map(m=>{
     const arr=dayRows().filter(x=>x.meal===m),t=sum(arr);
     return `<div class="meal">
